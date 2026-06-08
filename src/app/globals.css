@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --ios-background: #F5F5F7;
+  --ios-card: #FFFFFF;
+  --ios-secondary-card: #F9FAFB;
+  --ios-border: #E5E7EB;
+  --ios-text-primary: #1D1D1F;
+  --ios-text-secondary: #6B7280;
+  --ios-text-tertiary: #9CA3AF;
+  --ios-blue: #007AFF;
+  --ios-green: #34C759;
+  --ios-orange: #FF9500;
+  --ios-red: #FF3B30;
+  --ios-purple: #AF52DE;
+  --ios-shadow: rgba(0, 0, 0, 0.04);
+}
+
+body {
+  background-color: var(--ios-background);
+  color: var(--ios-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ios-card {
+  background-color: var(--ios-card);
+  border-radius: 24px;
+  border: 1px solid var(--ios-border);
+  box-shadow: 0 8px 30px var(--ios-shadow);
+}
+
+.ios-secondary-card {
+  background-color: var(--ios-secondary-card);
+  border-radius: 20px;
+  border: 1px solid var(--ios-border);
+}
+
+.ios-button-primary {
+  background-color: var(--ios-text-primary);
+  color: white;
+  border-radius: 9999px;
+  height: 48px;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.ios-button-primary:hover {
+  background-color: #000000;
+}
+
+.ios-button-secondary {
+  background-color: white;
+  color: var(--ios-text-primary);
+  border: 1px solid var(--ios-border);
+  border-radius: 9999px;
+  transition: all 0.15s ease-in-out;
+}
+
+.ios-button-secondary:hover {
+  background-color: var(--ios-secondary-card);
+}
+
+.ios-input {
+  background-color: var(--ios-secondary-card);
+  border: 1px solid var(--ios-border);
+  border-radius: 12px;
+  color: var(--ios-text-primary);
+  transition: all 0.15s ease-in-out;
+}
+
+.ios-input:focus {
+  outline: none;
+  border-color: var(--ios-blue);
+  background-color: #EEF6FF;
+}
+
+.ios-avatar {
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
+}
+
+@keyframes breathing {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.015);
+    opacity: 0.98;
+  }
+}
+
+.animate-breathing {
+  animation: breathing 3.5s ease-in-out infinite;
+}
