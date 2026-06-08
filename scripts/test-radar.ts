@@ -884,8 +884,8 @@ function isInNegativeContext(text: string, keyword: string): boolean {
   
   // 特殊检查：如果关键词前面有 "从...转向" 模式
   try {
-    const转向Match = lowerText.match(new RegExp(`从.{0,20}${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.{0,20}转向`));
-    if (转向Match) {
+    const transitionMatch = lowerText.match(new RegExp(`从.{0,20}${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.{0,20}转向`));
+    if (transitionMatch) {
       return true;
     }
   } catch (e) {

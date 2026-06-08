@@ -14,7 +14,7 @@ export default function FutureSelfStartOverlay({
   return (
     <div className="fixed inset-0 bg-[#F5F5F7] flex flex-col items-center justify-center z-50">
       <div className="animate-bounce">
-        <FutureSelfAvatar size={140} />
+        <FutureSelfAvatar size="lg" />
       </div>
       <p className="mt-6 text-base text-[#6B7280]">{text}</p>
       <p className="mt-2 text-xs text-[#9CA3AF]">{subtext}</p>

@@ -37,7 +37,7 @@ function buildPrompt(profile: FutureProfile, changeSignals: ChangeSignal[], user
     userState: userStateProfile?.state || currentTask || 'general_exploration',
     goal: profile.currentGoal,
     anxiety: profile.currentAnxiety,
-    weeklyTime: profile.availableTimePerWeek,
+    weeklyTime: profile.weeklyTime,
     riskPreference: profile.riskPreference,
   };
 
@@ -705,7 +705,7 @@ export async function POST(request: NextRequest) {
       userState: body.userStateProfile?.state || currentTask || 'general_exploration',
       goal: profile.currentGoal,
       anxiety: profile.currentAnxiety,
-      weeklyTime: profile.availableTimePerWeek,
+      weeklyTime: profile.weeklyTime,
       riskPreference: profile.riskPreference,
     };
 

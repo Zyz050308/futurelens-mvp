@@ -227,12 +227,14 @@ export type CoreInsight = {
   "引用": string;
 };
 
-// V4.0 完整输出（已升级到 V6.1）
+// V4.0 完整输出（已升级到 V6.3）
 export type OpportunityRadarV4 = {
   todayChanges: TodayChange[];
   personalImpact?: PersonalImpact;
   coreInsight?: CoreInsight;  // V6.1 新增
+  valueMigration?: ValueMigration;  // V6.0 新增
   impactOnUser: ImpactOnUser;
+  decisionExplanation?: DecisionExplanation;  // V5.8 新增
   actions: ActionItem[];
   futureSelfMessage: string;
 };
@@ -300,13 +302,4 @@ export type ValueMigration = {
   urgencyLevel: UrgencyLevel;      // 迁移紧迫度
 };
 
-// 更新 OpportunityRadarV4，包含 DecisionExplanation 和 ValueMigration
-export type OpportunityRadarV4 = {
-  todayChanges: TodayChange[];
-  personalImpact?: PersonalImpact;
-  valueMigration?: ValueMigration;  // V6.0 新增
-  impactOnUser: ImpactOnUser;
-  decisionExplanation?: DecisionExplanation;  // V5.8 新增
-  actions: ActionItem[];
-  futureSelfMessage: string;
-};
+
