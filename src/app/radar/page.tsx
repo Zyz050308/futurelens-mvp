@@ -164,6 +164,7 @@ function CoreInsightCard({ coreInsight, latestEvidence }: CoreInsightCardProps) 
   const theRealProblem = coreInsight["真正的问题是什么"];
   const oneSentenceToRemember = coreInsight["如果只记住一句话"];
   const evidenceImpact = getEvidenceImpact(latestEvidence);
+  const currentJudgment = evidenceImpact?.judgment || theRealProblem;
 
   return (
     <section className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-[0_10px_35px_rgba(0,0,0,0.04)]">
@@ -184,12 +185,25 @@ function CoreInsightCard({ coreInsight, latestEvidence }: CoreInsightCardProps) 
       </div>
 
       <div className="text-xl sm:text-2xl font-semibold text-[#1D1D1F] leading-relaxed">
-        {theRealProblem}
+        {currentJudgment}
       </div>
 
-      <div className="mt-5 pt-5 border-t border-[#F0F0F2] text-sm text-[#6B7280] leading-relaxed">
-        {oneSentenceToRemember}
-      </div>
+      {latestEvidence && evidenceImpact ? (
+        <div className="mt-5 pt-5 border-t border-[#F0F0F2] space-y-3">
+          <div>
+            <div className="text-xs text-[#248A3D] font-semibold mb-1.5">这次现实结果</div>
+            <div className="text-sm text-[#1D1D1F] leading-relaxed">{latestEvidence.userResult}</div>
+          </div>
+          <div>
+            <div className="text-xs text-[#9CA3AF] mb-1.5">更新前的判断</div>
+            <div className="text-sm text-[#6B7280] leading-relaxed">{latestEvidence.sourceJudgment || theRealProblem}</div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 pt-5 border-t border-[#F0F0F2] text-sm text-[#6B7280] leading-relaxed">
+          {oneSentenceToRemember}
+        </div>
+      )}
     </section>
   );
 }
@@ -1401,6 +1415,10 @@ export default function RadarPage() {
             latestEvidence={latestEvidence}
           />
 
+          {latestEvidence && (
+            <UpdatedJudgmentCard record={latestEvidence} />
+          )}
+
           <RiskEngineCard
             risk30Days={radarData.impactOnUser?.risk30Days || '问题可能进一步积累'}
             risk90Days={radarData.impactOnUser?.risk90Days || '问题可能进一步恶化'}
@@ -1428,10 +1446,6 @@ export default function RadarPage() {
               onCancel={() => setVerificationPhase('started')}
               onSubmit={handleVerificationSubmitV2}
             />
-          )}
-
-          {verificationPhase === 'recorded' && latestEvidence && (
-            <UpdatedJudgmentCard record={latestEvidence} />
           )}
 
           <RecentDiscoveriesCard records={evidenceHistory} />

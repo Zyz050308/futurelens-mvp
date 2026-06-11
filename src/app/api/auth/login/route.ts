@@ -11,6 +11,13 @@ function isSmtpConfigured(): boolean {
   ].every(Boolean);
 }
 
+function isSecureRequest(request: NextRequest): boolean {
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  return forwardedProto
+    ? forwardedProto === 'https'
+    : request.nextUrl.protocol === 'https:';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -38,7 +45,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const user = await verifyLoginCode(email, code);
+    const user = await verifyLoginCode(email, code, {
+      secureCookie: isSecureRequest(request),
+    });
     return NextResponse.json({
       success: true,
       phase: 'verified',

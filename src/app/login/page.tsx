@@ -50,6 +50,7 @@ export default function LoginPage() {
         const response = await fetch('/api/auth/me', {
           method: 'GET',
           cache: 'no-store',
+          credentials: 'include',
         });
         const result = await response.json();
 
@@ -81,6 +82,7 @@ export default function LoginPage() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -112,6 +114,7 @@ export default function LoginPage() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -123,8 +126,18 @@ export default function LoginPage() {
         throw new Error(result.error || '验证码无效');
       }
 
-      router.replace(getReturnPath());
-      router.refresh();
+      const sessionResponse = await fetch('/api/auth/me', {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      const sessionResult = await sessionResponse.json();
+
+      if (!sessionResponse.ok || !sessionResult.user) {
+        throw new Error('登录状态未能保存，请检查当前访问地址是否允许 Cookie');
+      }
+
+      window.location.replace(getReturnPath());
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '登录失败');
     } finally {

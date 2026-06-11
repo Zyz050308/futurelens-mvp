@@ -73,12 +73,16 @@ export default function HomePage() {
         const response = await fetch('/api/auth/me', {
           method: 'GET',
           cache: 'no-store',
+          credentials: 'include',
         });
         const result = await response.json();
 
-        if (isMounted && response.ok && result.user?.email) {
-          setUserEmail(result.user.email);
-          setHasExistingProfile(true);
+        if (isMounted && response.ok) {
+          const email = result.user?.email || null;
+          setUserEmail(email);
+          if (email) {
+            setHasExistingProfile(true);
+          }
         }
       } catch {
         // The homepage remains usable when authentication is unavailable.
@@ -86,9 +90,23 @@ export default function HomePage() {
     };
 
     loadCurrentUser();
+    const handlePageShow = () => loadCurrentUser();
+    const handleFocus = () => loadCurrentUser();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadCurrentUser();
+      }
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

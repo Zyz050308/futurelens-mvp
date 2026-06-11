@@ -14,6 +14,7 @@ const LOGIN_CODE_TTL_MINUTES = 5;
 const SESSION_TTL_DAYS = 30;
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SESSION_TTL_SECONDS = SESSION_TTL_DAYS * 24 * 60 * 60;
 
 function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
@@ -79,7 +80,15 @@ export async function issueLoginCode(emailInput: string) {
   };
 }
 
-export async function verifyLoginCode(emailInput: string, code: string) {
+type VerifyLoginCodeOptions = {
+  secureCookie?: boolean;
+};
+
+export async function verifyLoginCode(
+  emailInput: string,
+  code: string,
+  options: VerifyLoginCodeOptions = {}
+) {
   const email = normalizeEmail(emailInput);
   const user = await findUserByEmail(email);
   if (!user || !user.loginCodeHash || !user.loginCodeExpiresAt) {
@@ -113,9 +122,11 @@ export async function verifyLoginCode(emailInput: string, code: string) {
   cookieStore.set(SESSION_COOKIE_NAME, sessionToken, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: options.secureCookie ?? process.env.NODE_ENV === 'production',
     expires: new Date(sessionExpiresAtMs),
+    maxAge: SESSION_TTL_SECONDS,
     path: '/',
+    priority: 'high',
   });
 
   return toPublicUser(updatedUser);

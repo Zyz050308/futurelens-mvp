@@ -434,10 +434,12 @@ export default function ProfilePage() {
       const authResponse = await fetch('/api/auth/me', {
         method: 'GET',
         cache: 'no-store',
+        credentials: 'include',
       });
       const authResult = await authResponse.json();
 
       if (!authResponse.ok || !authResult.user) {
+        setIsSubmitting(false);
         router.push('/login?from=/profile');
         return;
       }
