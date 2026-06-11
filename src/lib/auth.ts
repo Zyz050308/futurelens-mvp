@@ -17,6 +17,13 @@ function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
+function toMysqlDate(date: Date): string {
+  return date
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ');
+}
+
 function toPublicUser(user: UserRecord): PublicUser {
   return {
     id: user.id,
@@ -55,7 +62,7 @@ export async function issueLoginCode(emailInput: string) {
 
   await updateUserLoginCode(user.id, {
     loginCodeHash: sha256(code),
-    loginCodeExpiresAt: expiresAt.toISOString(),
+    loginCodeExpiresAt: toMysqlDate(expiresAt),
   });
 
   return {
@@ -82,13 +89,15 @@ export async function verifyLoginCode(emailInput: string, code: string) {
 
   const sessionToken = randomBytes(32).toString('hex');
   const sessionExpiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
-  const now = new Date().toISOString();
+  const now = new Date();
 
   const updatedUser = await updateUserSession(user.id, {
     sessionTokenHash: sha256(sessionToken),
-    sessionExpiresAt: sessionExpiresAt.toISOString(),
-    emailVerifiedAt: user.emailVerifiedAt || now,
-    lastLoginAt: now,
+    sessionExpiresAt: toMysqlDate(sessionExpiresAt),
+    emailVerifiedAt: user.emailVerifiedAt
+      ? toMysqlDate(new Date(user.emailVerifiedAt))
+      : toMysqlDate(now),
+    lastLoginAt: toMysqlDate(now),
     clearLoginCode: true,
   });
 

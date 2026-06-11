@@ -103,8 +103,8 @@ export async function updateUserSession(userId: string, input: UpdateSessionInpu
       input.sessionExpiresAt,
       input.emailVerifiedAt,
       input.lastLoginAt,
-      input.clearLoginCode ? null : undefined,
-      input.clearLoginCode ? null : undefined,
+      null,
+      null,
       userId,
     ]
   );
