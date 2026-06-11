@@ -22,6 +22,8 @@ const EMPTY_PROFILE: FutureProfile = {
   riskPreference: '',
 };
 
+const PROFILE_DRAFT_KEY = 'futurelens-profile-draft';
+
 async function fetchRemoteProfile(): Promise<FutureProfile | null> {
   try {
     const response = await fetch('/api/profile', {
@@ -348,6 +350,22 @@ export default function ProfilePage() {
     let isMounted = true;
 
     const hydrateRemoteProfile = async () => {
+      const draft = localStorage.getItem(PROFILE_DRAFT_KEY);
+      if (draft) {
+        try {
+          const draftProfile = JSON.parse(draft) as FutureProfile;
+          if (isMounted) {
+            setProfile(draftProfile);
+            if (getFilledFields(draftProfile).length >= 3) {
+              setUserState(analyzeUserState(draftProfile));
+            }
+          }
+          return;
+        } catch {
+          localStorage.removeItem(PROFILE_DRAFT_KEY);
+        }
+      }
+
       const remoteProfile = await fetchRemoteProfile();
       if (!isMounted || !remoteProfile) {
         return;
@@ -410,7 +428,19 @@ export default function ProfilePage() {
     setIsSubmitting(true);
 
     try {
+      localStorage.setItem(PROFILE_DRAFT_KEY, JSON.stringify(profile));
       saveProfile(profile);
+
+      const authResponse = await fetch('/api/auth/me', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const authResult = await authResponse.json();
+
+      if (!authResponse.ok || !authResult.user) {
+        router.push('/login?from=/profile');
+        return;
+      }
 
       const response = await fetch('/api/profile', {
         method: 'POST',
@@ -424,6 +454,7 @@ export default function ProfilePage() {
         const result = await response.json();
         if (result.profile) {
           saveProfile(result.profile);
+          localStorage.removeItem(PROFILE_DRAFT_KEY);
         }
       } else if (response.status !== 401) {
         throw new Error('Failed to save profile');

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Sparkles, ArrowRight, Compass, TrendingUp, Target, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { hasProfile } from '@/lib/radar';
 import HeroQuestionsVisual from '@/components/HeroQuestionsVisual';
@@ -60,27 +60,53 @@ function FlowStep({ title, isArrow = false }: FlowStepProps) {
 }
 
 export default function HomePage() {
-  const router = useRouter();
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     setHasExistingProfile(hasProfile());
+
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const result = await response.json();
+
+        if (isMounted && response.ok && result.user?.email) {
+          setUserEmail(result.user.email);
+          setHasExistingProfile(true);
+        }
+      } catch {
+        // The homepage remains usable when authentication is unavailable.
+      }
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const handleCreate = () => {
-    router.push('/profile');
-  };
-
-  const handleContinue = () => {
-    router.push('/profile');
-  };
 
   return (
     <div className="min-h-screen bg-[#F5F5F7]">
       {/* ============================================================ */}
       {/* 第一屏：Hero */}
       {/* ============================================================ */}
-      <section className="min-h-screen flex items-center overflow-hidden">
+      <section className="min-h-screen flex items-center overflow-hidden relative">
+        <div className="absolute top-5 right-6 z-20">
+          <Link
+            href={userEmail ? '/profile' : '/login'}
+            className="text-sm text-[#6B7280] hover:text-[#1D1D1F] transition-colors max-w-[220px] truncate"
+            title={userEmail || '登录'}
+          >
+            {userEmail || '登录'}
+          </Link>
+        </div>
         <div className="max-w-7xl mx-auto px-6 py-16 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* 左侧：文案 */}
@@ -112,22 +138,22 @@ export default function HomePage() {
 
               {/* 按钮 */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={handleCreate}
+                <Link
+                  href="/profile"
                   className="ios-button-primary inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-semibold"
                 >
                   开始创建我的 FutureLens Person
                   <ArrowRight className="w-5 h-5" />
-                </button>
+                </Link>
                 
                 {hasExistingProfile && (
-                  <button
-                    onClick={handleContinue}
+                  <Link
+                    href={userEmail ? '/radar' : '/login?from=/radar'}
                     className="ios-button-secondary inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-medium"
                   >
-                    继续我的 FutureLens Person
+                    继续我的 FutureLens
                     <ChevronRight className="w-5 h-5" />
-                  </button>
+                  </Link>
                 )}
               </div>
 
@@ -138,7 +164,7 @@ export default function HomePage() {
             </div>
 
             {/* 右侧：动效 */}
-            <div className="order-1 lg:order-2 relative w-full lg:w-[55%] h-[300px] lg:min-h-[680px] overflow-hidden">
+            <div className="order-1 lg:order-2 relative w-full lg:w-[55%] h-[300px] lg:min-h-[680px] overflow-hidden pointer-events-none">
               <HeroQuestionsVisual />
             </div>
           </div>
@@ -223,13 +249,13 @@ export default function HomePage() {
             先从一句真实的困惑开始。
           </h2>
           
-          <button
-            onClick={handleCreate}
+          <Link
+            href="/profile"
             className="ios-button-primary inline-flex items-center justify-center gap-2 px-10 py-5 text-lg font-semibold"
           >
             创建我的 FutureLens Person
             <Zap className="w-6 h-6" />
-          </button>
+          </Link>
 
           <p className="text-xs text-[#9CA3AF] mt-6">
             不用填写复杂问卷。只需要告诉我你现在最纠结的一件事。
