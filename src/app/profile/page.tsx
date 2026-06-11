@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, Loader2, ChevronRight, User, Package, Target, AlertTriangle, CheckCircle2, Clock, TrendingUp, Shield, Brain } from 'lucide-react';
+import { Sparkles, ArrowRight, Loader2, ChevronRight, User, Package, Target, AlertTriangle, CheckCircle2, Clock, TrendingUp, Shield, Brain, MessageCircle } from 'lucide-react';
 import { saveProfile, loadProfile } from '@/lib/radar';
 import { analyzeUserState } from '@/lib/stateEngine';
 import type { FutureProfile, UserStateProfile } from '@/types/radar';
@@ -14,13 +14,36 @@ const EMPTY_PROFILE: FutureProfile = {
   education: '',
   majorOrCareer: '',
   currentSkills: '',
-  interests: '',
+  currentSituation: '',
   currentGoal: '',
   currentAnxiety: '',
   desiredOutcome: '',
   weeklyTime: '',
   riskPreference: '',
 };
+
+async function fetchRemoteProfile(): Promise<FutureProfile | null> {
+  try {
+    const response = await fetch('/api/profile', {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    if (response.status === 401) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error('Failed to load profile');
+    }
+
+    const result = await response.json();
+    return result.profile || null;
+  } catch (error) {
+    console.error('[Profile] Failed to fetch remote profile:', error);
+    return null;
+  }
+}
 
 // ============================================================
 // 工具函数
@@ -33,10 +56,10 @@ function getFilledFields(profile: FutureProfile): string[] {
   if (profile.age?.trim().length > 0) filled.push('年龄');
   if (profile.education?.trim().length > 0) filled.push('学历');
   if (profile.currentSkills?.trim().length > 0) filled.push('当前能力');
-  if (profile.interests?.trim().length > 0) filled.push('兴趣方向');
+  if (profile.currentSituation?.trim().length > 0) filled.push('最近纠结的事');
   if (profile.desiredOutcome) filled.push('想获得什么');
-  if (profile.currentGoal?.trim().length > 0) filled.push('当前目标');
-  if (profile.currentAnxiety?.trim().length > 0) filled.push('当前焦虑');
+  if (profile.currentGoal?.trim().length > 0) filled.push('最想获得什么');
+  if (profile.currentAnxiety?.trim().length > 0) filled.push('最担心失去什么');
   if (profile.weeklyTime) filled.push('每周时间');
   if (profile.riskPreference) filled.push('风险偏好');
   
@@ -47,10 +70,10 @@ function getMissingFields(profile: FutureProfile): string[] {
   const missing: string[] = [];
   
   if (!profile.majorOrCareer?.trim().length) missing.push('专业/职业');
-  if (!profile.currentSkills?.trim().length) missing.push('当前能力');
+  if (!profile.currentSituation?.trim().length) missing.push('最近纠结的事');
   if (!profile.desiredOutcome) missing.push('想获得什么');
-  if (!profile.currentGoal?.trim().length) missing.push('当前目标');
-  if (!profile.currentAnxiety?.trim().length) missing.push('当前焦虑');
+  if (!profile.currentGoal?.trim().length) missing.push('最想获得什么');
+  if (!profile.currentAnxiety?.trim().length) missing.push('最担心失去什么');
   if (!profile.weeklyTime) missing.push('每周时间');
   if (!profile.riskPreference) missing.push('风险偏好');
   
@@ -105,12 +128,12 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
   
   // 影响判断的标签
   const influenceTags = [
+    { key: '最近纠结的事', label: '当前处境影响判断', filled: !!profile.currentSituation },
     { key: '职业背景', label: '职业影响变化信号', filled: !!profile.majorOrCareer },
-    { key: '想获得什么', label: '目标影响行动方向', filled: !!profile.desiredOutcome },
-    { key: '当前焦虑', label: '焦虑影响优先级', filled: !!profile.currentAnxiety },
+    { key: '最想获得什么', label: '目标影响行动方向', filled: !!profile.currentGoal },
+    { key: '最担心失去什么', label: '焦虑影响优先级', filled: !!profile.currentAnxiety },
     { key: '每周时间', label: '时间影响任务大小', filled: !!profile.weeklyTime },
     { key: '风险偏好', label: '风险偏好影响路径', filled: !!profile.riskPreference },
-    { key: '当前能力', label: '能力影响起步难度', filled: !!profile.currentSkills },
   ];
 
   if (!hasEnoughInfo) {
@@ -126,7 +149,7 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
         </div>
         
         <p className="text-sm text-[#6B7280] mb-6">
-          填写你的身份、目标和焦虑后，FutureLens 会开始判断你当前所处的状态。
+          把你最近纠结的事情告诉 FutureLens，它会帮你找到真正的问题所在。
         </p>
         
         <div className="bg-[#F9FAFB] rounded-xl p-4">
@@ -134,15 +157,15 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <div className="w-1 h-1 rounded-full bg-[#FF9500]" />
-              <span>专业/职业</span>
+              <span>最近纠结的事</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <div className="w-1 h-1 rounded-full bg-[#FF9500]" />
-              <span>想获得什么</span>
+              <span>最想获得什么</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <div className="w-1 h-1 rounded-full bg-[#FF9500]" />
-              <span>当前焦虑</span>
+              <span>最担心失去什么</span>
             </div>
           </div>
         </div>
@@ -321,6 +344,30 @@ export default function ProfilePage() {
   const [userState, setUserState] = useState<UserStateProfile | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateRemoteProfile = async () => {
+      const remoteProfile = await fetchRemoteProfile();
+      if (!isMounted || !remoteProfile) {
+        return;
+      }
+
+      setProfile(remoteProfile);
+      saveProfile(remoteProfile);
+
+      if (getFilledFields(remoteProfile).length >= 3) {
+        setUserState(analyzeUserState(remoteProfile));
+      }
+    };
+
+    hydrateRemoteProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // 加载已有档案
   useEffect(() => {
     const existingProfile = loadProfile();
@@ -357,6 +404,42 @@ export default function ProfilePage() {
 
   const handleChange = (field: keyof FutureProfile, value: string) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmitV2 = async () => {
+    setIsSubmitting(true);
+
+    try {
+      saveProfile(profile);
+
+      const response = await fetch('/api/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profile),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.profile) {
+          saveProfile(result.profile);
+        }
+      } else if (response.status !== 401) {
+        throw new Error('Failed to save profile');
+      }
+
+      localStorage.removeItem('futurelens-latest-radar');
+      localStorage.removeItem('futurelens-latest-radar-created-at');
+      localStorage.removeItem('futurelens-latest-radar-profile-hash');
+      localStorage.removeItem('futurelens-latest-user-state');
+
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      router.push('/radar');
+    } catch (error) {
+      console.error('[Profile] Failed to save profile:', error);
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -397,6 +480,37 @@ export default function ProfilePage() {
           {/* 左侧表单 */}
           <div className="lg:col-span-7">
             
+            {/* 分组零：最近最让你纠结的一件事 */}
+            <FormGroup
+              icon={<MessageCircle className="w-5 h-5 text-[#FF3B30]" />}
+              title="最近最让你纠结的一件事是什么"
+              subtitle="这是系统理解你的最重要入口，优先填写这个"
+            >
+              <div className="p-4">
+                <textarea
+                  value={profile.currentSituation}
+                  onChange={(e) => handleChange('currentSituation', e.target.value)}
+                  placeholder={`例如：
+我准备考雅思，
+每天学习很久，
+但成绩一直没有明显提高。
+
+或者：
+
+我学视觉传达，
+会设计也会拍视频，
+但不知道毕业后应该继续做设计还是转向AI。
+
+或者：
+
+我已经工作两年，
+但越来越担心自己的能力被AI替代。`}
+                  rows={6}
+                  className="w-full px-4 py-3 text-sm placeholder-[#9CA3AF] resize-none border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
+                />
+              </div>
+            </FormGroup>
+
             {/* 分组一：你是谁 */}
             <FormGroup
               icon={<User className="w-5 h-5 text-[#007AFF]" />}
@@ -438,7 +552,7 @@ export default function ProfilePage() {
               title="你有什么"
               subtitle="这些信息决定系统判断你能从哪里开始"
             >
-              <FormRow label="当前能力">
+              <FormRow label="当前能力" last>
                 <input
                   type="text"
                   value={profile.currentSkills}
@@ -447,21 +561,12 @@ export default function ProfilePage() {
                   className={inputClass}
                 />
               </FormRow>
-              <FormRow label="兴趣方向" last>
-                <input
-                  type="text"
-                  value={profile.interests}
-                  onChange={(e) => handleChange('interests', e.target.value)}
-                  placeholder="如：品牌设计、AI应用"
-                  className={inputClass}
-                />
-              </FormRow>
             </FormGroup>
 
-            {/* 分组三：你想要什么 */}
+            {/* 分组三：你最想获得什么 */}
             <FormGroup
               icon={<Target className="w-5 h-5 text-[#AF52DE]" />}
-              title="你想要什么"
+              title="你最想获得什么"
               subtitle="这些信息决定系统优先帮你解决什么问题"
             >
               <FormRow label="想获得什么">
@@ -480,28 +585,28 @@ export default function ProfilePage() {
                   <option value="留学">留学</option>
                 </select>
               </FormRow>
-              <FormRow label="当前目标" last>
+              <FormRow label="你最想获得什么" last>
                 <textarea
                   value={profile.currentGoal}
                   onChange={(e) => handleChange('currentGoal', e.target.value)}
-                  placeholder="如：找到能发挥设计能力又能赚钱的方向"
+                  placeholder="如：通过雅思、找到工作、增加收入"
                   rows={2}
                   className={textareaClass}
                 />
               </FormRow>
             </FormGroup>
 
-            {/* 分组四：你被什么卡住 */}
+            {/* 分组四：你最担心失去什么 */}
             <FormGroup
               icon={<AlertTriangle className="w-5 h-5 text-[#FF9500]" />}
-              title="你被什么卡住"
+              title="你最担心失去什么"
               subtitle="这些信息决定系统给你多激进、多现实的行动建议"
             >
-              <FormRow label="当前焦虑">
+              <FormRow label="你最担心失去什么">
                 <textarea
                   value={profile.currentAnxiety}
                   onChange={(e) => handleChange('currentAnxiety', e.target.value)}
-                  placeholder="如：担心只会做图以后没有竞争力"
+                  placeholder="如：错过申请时间、毕业失业、被AI替代"
                   rows={2}
                   className={textareaClass}
                 />
@@ -537,7 +642,7 @@ export default function ProfilePage() {
             {/* 提交按钮 */}
             <div className="mt-8 pb-8">
               <button
-                onClick={handleSubmit}
+                onClick={handleSubmitV2}
                 disabled={isSubmitting}
                 className="ios-button-primary w-full flex items-center justify-center gap-2 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >

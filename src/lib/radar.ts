@@ -195,10 +195,10 @@ export function detectBackgroundDomain(profile: FutureProfile): BackgroundDomain
 export function detectCurrentTask(profile: FutureProfile): CurrentTask {
   const goalText = profile.currentGoal.toLowerCase();
   const anxietyText = profile.currentAnxiety.toLowerCase();
-  const interestsText = profile.interests.toLowerCase();
+  const currentSituationText = profile.currentSituation.toLowerCase();
   const skillsText = profile.currentSkills.toLowerCase();
   const desiredText = profile.desiredOutcome.toLowerCase();
-  const allText = `${goalText} ${anxietyText} ${interestsText} ${skillsText} ${desiredText}`;
+  const allText = `${goalText} ${anxietyText} ${currentSituationText} ${skillsText} ${desiredText}`;
 
   if (countKeywordMatches(allText, EXAM_KEYWORDS) > 0) {
     return 'exam';
@@ -242,9 +242,9 @@ export function detectCurrentTask(profile: FutureProfile): CurrentTask {
 export function detectSecondaryTask(profile: FutureProfile): SecondaryTask {
   const goalText = profile.currentGoal.toLowerCase();
   const anxietyText = profile.currentAnxiety.toLowerCase();
-  const interestsText = profile.interests.toLowerCase();
+  const currentSituationText = profile.currentSituation.toLowerCase();
   const skillsText = profile.currentSkills.toLowerCase();
-  const allText = `${goalText} ${anxietyText} ${interestsText} ${skillsText}`;
+  const allText = `${goalText} ${anxietyText} ${currentSituationText} ${skillsText}`;
 
   // 优先级 1: 研究生专业选择
   if (countKeywordMatches(allText, GRADUATE_MAJOR_KEYWORDS) > 0) {
@@ -1342,7 +1342,7 @@ function getSpecificityScore(value: string): number {
 }
 
 function getRelevanceScore(profile: FutureProfile): number {
-  const interests = profile.interests.toLowerCase();
+  const interests = profile.currentSituation.toLowerCase();
   const skills = profile.currentSkills.toLowerCase();
   const goal = profile.currentGoal.toLowerCase();
   const allText = `${interests} ${skills} ${goal}`;
@@ -1371,7 +1371,7 @@ function isProfileMeaningful(profile: FutureProfile): boolean {
   const fields = [
     profile.majorOrCareer,
     profile.currentSkills,
-    profile.interests,
+    profile.currentSituation,
     profile.currentGoal,
     profile.currentAnxiety,
     profile.weeklyTime,
@@ -1414,7 +1414,7 @@ function getDriveLevelAndValue(profile: FutureProfile): { value: number; level: 
   const hasOutcome = isMeaningfulInput(profile.desiredOutcome);
   
   // 检查是否有真实技能关键词
-  const skillsText = `${profile.currentSkills} ${profile.interests}`;
+  const skillsText = `${profile.currentSkills} ${profile.currentSituation}`;
   const hasRealSkills = /设计|编程|运营|写作|数据分析|摄影|剪辑|前端/.test(skillsText);
   
   if (!hasSkills && !hasTime) {
@@ -1480,7 +1480,7 @@ export function detectStageLabel(profile: FutureProfile): string {
     profile.currentGoal,
     profile.currentAnxiety,
     profile.desiredOutcome,
-    profile.interests,
+    profile.currentSituation,
   ].join(' ').toLowerCase();
 
   for (const [label, keywords] of Object.entries(STAGE_KEYWORDS)) {

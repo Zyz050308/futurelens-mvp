@@ -260,7 +260,7 @@ function getDomainScore(profile: FutureProfile): Record<UserDomain, number> {
     profile.education,
     profile.majorOrCareer,
     profile.currentSkills,
-    profile.interests,
+    profile.currentSituation,
     profile.currentGoal,
     profile.currentAnxiety,
     profile.desiredOutcome,
@@ -302,7 +302,7 @@ function calculateSignalMatchScore(
     profile.currentSkills,
     profile.currentGoal,
     profile.currentAnxiety,
-    profile.interests,
+    profile.currentSituation,
     profile.desiredOutcome,
   ].filter(Boolean).join(' ').toLowerCase();
   
@@ -352,7 +352,7 @@ function calculateSignalMatchScore(
       score += 20;
       reasons.push(`机会与稳定目标匹配`);
     }
-    if (opportunity.toLowerCase().includes('证书') && profile.interests?.toLowerCase().includes('证书')) {
+    if (opportunity.toLowerCase().includes('证书') && profile.currentSituation?.toLowerCase().includes('证书')) {
       score += 20;
       reasons.push(`机会与证书兴趣匹配`);
     }

@@ -3,9 +3,9 @@ export type FutureProfile = {
   education: string;
   majorOrCareer: string;
   currentSkills: string;
-  interests: string;
-  currentGoal: string;
-  currentAnxiety: string;
+  currentSituation: string;  // V6.6 新增：最高权重字段
+  currentGoal: string;  // V6.6 重命名：你最想获得什么
+  currentAnxiety: string;  // V6.6 重命名：你最担心失去什么
   desiredOutcome: string;
   weeklyTime: string;
   riskPreference: string;
@@ -196,20 +196,25 @@ export type TodayChange = {
   whyItMatters: string;
 };
 
-// 对用户的影响
+// 对用户的影响（V6.6 升级：增加具体时间后果）
 export type ImpactOnUser = {
   identity: string;
   currentProblem: string;
-  risk: string;
+  risk30Days: string;  // V6.6 新增：30天后的具体后果
+  risk90Days: string;  // V6.6 新增：90天后的具体后果
+  mostLikelyResult: string;  // V6.6 新增：最可能的结果
   opportunity: string;
 };
 
-// 行动项
+// 行动项（V6.6 升级：今晚行动增加具体平台和关键词）
 export type ActionItem = {
   time: string;
   task: string;
   reason: string;
   successCriteria: string;
+  platform?: string;  // V6.6 新增：今晚任务需要打开的平台
+  keywords?: string;  // V6.6 新增：今晚任务需要搜索的关键词
+  action?: string;  // V6.6 新增：今晚任务需要完成的具体动作
 };
 
 // V5.5 Personal Impact 类型
@@ -220,11 +225,12 @@ export type PersonalImpact = {
   risk: string;
 };
 
-// V6.1 CoreInsight 类型
+// V6.7 CoreInsight 类型（从「分析」升级到「理解」）
 export type CoreInsight = {
-  "你以为": string;
-  "实际上": string;
-  "引用": string;
+  "你正在经历什么": string;  // V6.7 新增：系统复述用户状态，让用户感觉被理解
+  "你真正害怕失去什么": string;  // V6.7 新增：触达情绪、恐惧和真正驱动力
+  "真正的问题是什么": string;  // V6.7 升级：分析结构而非行为
+  "如果只记住一句话": string;  // V6.7 新增：整个页面最重要的一句话
 };
 
 // V4.0 完整输出（已升级到 V6.3）

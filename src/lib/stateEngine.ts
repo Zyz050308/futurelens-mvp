@@ -143,7 +143,7 @@ function mergeProfileFields(profile: FutureProfile): string {
     profile.education,
     profile.majorOrCareer,
     profile.currentSkills,
-    profile.interests,
+    profile.currentSituation,
     profile.currentGoal,
     profile.currentAnxiety,
     profile.desiredOutcome,
