@@ -10,18 +10,25 @@ import {
 } from '@/lib/repositories/users';
 
 const SESSION_COOKIE_NAME = 'futurelens_session';
-const LOGIN_CODE_TTL_MINUTES = 10;
+const LOGIN_CODE_TTL_MINUTES = 5;
 const SESSION_TTL_DAYS = 30;
+const MINUTE_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
-function toMysqlDate(date: Date): string {
-  return date
+function toMysqlUtcDate(timestampMs: number): string {
+  return new Date(timestampMs)
     .toISOString()
     .slice(0, 19)
     .replace('T', ' ');
+}
+
+function toTimestamp(value: string): number {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function toPublicUser(user: UserRecord): PublicUser {
@@ -58,16 +65,16 @@ export async function issueLoginCode(emailInput: string) {
   }
 
   const code = `${randomInt(100000, 1000000)}`;
-  const expiresAt = new Date(Date.now() + LOGIN_CODE_TTL_MINUTES * 60 * 1000);
+  const expiresAtMs = Date.now() + LOGIN_CODE_TTL_MINUTES * MINUTE_MS;
 
   await updateUserLoginCode(user.id, {
     loginCodeHash: sha256(code),
-    loginCodeExpiresAt: toMysqlDate(expiresAt),
+    loginCodeExpiresAt: toMysqlUtcDate(expiresAtMs),
   });
 
   return {
     email,
-    expiresAt: expiresAt.toISOString(),
+    expiresAt: new Date(expiresAtMs).toISOString(),
     devCode: code,
   };
 }
@@ -79,7 +86,8 @@ export async function verifyLoginCode(emailInput: string, code: string) {
     throw new Error('Login code not found');
   }
 
-  if (Date.parse(user.loginCodeExpiresAt) < Date.now()) {
+  const expiresAtMs = toTimestamp(user.loginCodeExpiresAt);
+  if (expiresAtMs <= Date.now()) {
     throw new Error('Login code expired');
   }
 
@@ -88,16 +96,16 @@ export async function verifyLoginCode(emailInput: string, code: string) {
   }
 
   const sessionToken = randomBytes(32).toString('hex');
-  const sessionExpiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
-  const now = new Date();
+  const nowMs = Date.now();
+  const sessionExpiresAtMs = nowMs + SESSION_TTL_DAYS * DAY_MS;
 
   const updatedUser = await updateUserSession(user.id, {
     sessionTokenHash: sha256(sessionToken),
-    sessionExpiresAt: toMysqlDate(sessionExpiresAt),
+    sessionExpiresAt: toMysqlUtcDate(sessionExpiresAtMs),
     emailVerifiedAt: user.emailVerifiedAt
-      ? toMysqlDate(new Date(user.emailVerifiedAt))
-      : toMysqlDate(now),
-    lastLoginAt: toMysqlDate(now),
+      ? toMysqlUtcDate(toTimestamp(user.emailVerifiedAt))
+      : toMysqlUtcDate(nowMs),
+    lastLoginAt: toMysqlUtcDate(nowMs),
     clearLoginCode: true,
   });
 
@@ -106,7 +114,7 @@ export async function verifyLoginCode(emailInput: string, code: string) {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    expires: sessionExpiresAt,
+    expires: new Date(sessionExpiresAtMs),
     path: '/',
   });
 
@@ -125,7 +133,8 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
     return null;
   }
 
-  if (Date.parse(user.sessionExpiresAt) < Date.now()) {
+  const sessionExpiresAtMs = toTimestamp(user.sessionExpiresAt);
+  if (sessionExpiresAtMs <= Date.now()) {
     return null;
   }
 

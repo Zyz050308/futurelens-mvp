@@ -25,6 +25,7 @@ export function getDbPool(): Pool {
     connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || '10'),
     queueLimit: 0,
     charset: 'utf8mb4',
+    timezone: 'Z',
   });
 
   return pool;
