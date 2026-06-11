@@ -343,6 +343,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<FutureProfile>(EMPTY_PROFILE);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [userState, setUserState] = useState<UserStateProfile | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -425,7 +426,12 @@ export default function ProfilePage() {
   };
 
   const handleSubmitV2 = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       localStorage.setItem(PROFILE_DRAFT_KEY, JSON.stringify(profile));
@@ -436,9 +442,13 @@ export default function ProfilePage() {
         cache: 'no-store',
         credentials: 'include',
       });
-      const authResult = await authResponse.json();
+      const authResult = await authResponse.json().catch(() => null);
 
-      if (!authResponse.ok || !authResult.user) {
+      if (!authResponse.ok) {
+        throw new Error(authResult?.error || '无法确认登录状态，请稍后重试');
+      }
+
+      if (!authResult?.user) {
         setIsSubmitting(false);
         router.push('/login?from=/profile');
         return;
@@ -446,31 +456,35 @@ export default function ProfilePage() {
 
       const response = await fetch('/api/profile', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(profile),
       });
+      const result = await response.json().catch(() => null);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.profile) {
-          saveProfile(result.profile);
-          localStorage.removeItem(PROFILE_DRAFT_KEY);
-        }
-      } else if (response.status !== 401) {
-        throw new Error('Failed to save profile');
+      if (response.status === 401) {
+        setIsSubmitting(false);
+        router.push('/login?from=/profile');
+        return;
       }
 
+      if (!response.ok || !result?.success || !result.profile) {
+        throw new Error(result?.error || 'Profile 保存失败，请稍后重试');
+      }
+
+      saveProfile(result.profile);
+      localStorage.removeItem(PROFILE_DRAFT_KEY);
       localStorage.removeItem('futurelens-latest-radar');
       localStorage.removeItem('futurelens-latest-radar-created-at');
       localStorage.removeItem('futurelens-latest-radar-profile-hash');
       localStorage.removeItem('futurelens-latest-user-state');
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      router.push('/radar');
+      window.location.assign('/radar');
     } catch (error) {
       console.error('[Profile] Failed to save profile:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Profile 保存失败，请稍后重试');
       setIsSubmitting(false);
     }
   };
@@ -675,6 +689,7 @@ export default function ProfilePage() {
             {/* 提交按钮 */}
             <div className="mt-8 pb-8">
               <button
+                type="button"
                 onClick={handleSubmitV2}
                 disabled={isSubmitting}
                 className="ios-button-primary w-full flex items-center justify-center gap-2 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
@@ -692,6 +707,11 @@ export default function ProfilePage() {
                   </>
                 )}
               </button>
+              {submitError && (
+                <p className="text-sm text-[#FF3B30] text-center mt-3">
+                  {submitError}
+                </p>
+              )}
               <p className="text-xs text-[#9CA3AF] text-center mt-3">
                 填写越完整，分析越精准
               </p>
