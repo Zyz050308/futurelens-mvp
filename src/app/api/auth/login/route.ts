@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { issueLoginCode, verifyLoginCode } from '@/lib/auth';
 
+function isSmtpConfigured(): boolean {
+  return [
+    process.env.SMTP_HOST,
+    process.env.SMTP_PORT,
+    process.env.SMTP_USER,
+    process.env.SMTP_PASSWORD,
+    process.env.SMTP_FROM,
+  ].every(Boolean);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -16,12 +26,15 @@ export async function POST(request: NextRequest) {
 
     if (!code) {
       const result = await issueLoginCode(email);
+      const smtpConfigured = isSmtpConfigured();
+
       return NextResponse.json({
         success: true,
         phase: 'code_sent',
         email: result.email,
         expiresAt: result.expiresAt,
-        devCode: result.devCode,
+        delivery: smtpConfigured ? 'email' : 'development',
+        devCode: smtpConfigured ? undefined : result.devCode,
       });
     }
 

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Mail } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Loader2, Mail } from 'lucide-react';
 
 type LoginStep = 'email' | 'code';
 
@@ -13,6 +13,7 @@ type LoginResponse = {
   email?: string;
   expiresAt?: string;
   devCode?: string;
+  delivery?: 'email' | 'development';
   error?: string;
 };
 
@@ -35,6 +36,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState('');
+  const [delivery, setDelivery] = useState<'email' | 'development'>('email');
+  const [isCopied, setIsCopied] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -91,6 +94,8 @@ export default function LoginPage() {
 
       setEmail(result.email || email.trim().toLowerCase());
       setDevCode(result.devCode || '');
+      setDelivery(result.delivery || (result.devCode ? 'development' : 'email'));
+      setIsCopied(false);
       setStep('code');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '验证码发送失败');
@@ -127,6 +132,20 @@ export default function LoginPage() {
     }
   };
 
+  const copyDevCode = async () => {
+    if (!devCode) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(devCode);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 1500);
+    } catch {
+      setError('复制失败，请手动选择验证码');
+    }
+  };
+
   if (isCheckingSession) {
     return (
       <main className="min-h-screen bg-[#F5F5F7] flex items-center justify-center">
@@ -157,7 +176,9 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-[#6B7280] leading-relaxed">
             {step === 'email'
               ? '登录后，你的 Profile 和发现记录可以跨设备恢复。'
-              : `验证码已发送至 ${email}`}
+              : delivery === 'development'
+                ? `当前使用开发验证码登录：${email}`
+                : `验证码已发送至 ${email}`}
           </p>
 
           {step === 'email' ? (
@@ -209,8 +230,21 @@ export default function LoginPage() {
               />
 
               {devCode && (
-                <div className="mt-3 rounded-lg bg-[#FFF7E8] px-3 py-2 text-sm text-[#9A6700]">
-                  开发验证码：<span className="font-semibold">{devCode}</span>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-[#FFF7E8] px-3 py-2 text-sm text-[#9A6700]">
+                  <span>
+                    开发验证码：<span className="font-semibold select-all">{devCode}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyDevCode}
+                    aria-label="复制开发验证码"
+                    title="复制开发验证码"
+                    className="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-[#9A6700]/10"
+                  >
+                    {isCopied
+                      ? <Check className="w-4 h-4" />
+                      : <Copy className="w-4 h-4" />}
+                  </button>
                 </div>
               )}
 
@@ -232,6 +266,8 @@ export default function LoginPage() {
                   setStep('email');
                   setCode('');
                   setDevCode('');
+                  setDelivery('email');
+                  setIsCopied(false);
                   setError('');
                 }}
                 className="w-full mt-3 py-2 text-sm text-[#007AFF] disabled:opacity-50"

@@ -68,7 +68,7 @@ export async function issueLoginCode(emailInput: string) {
   return {
     email,
     expiresAt: expiresAt.toISOString(),
-    devCode: process.env.NODE_ENV === 'production' ? undefined : code,
+    devCode: code,
   };
 }
 
