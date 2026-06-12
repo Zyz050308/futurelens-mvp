@@ -344,6 +344,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<FutureProfile>(EMPTY_PROFILE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitStage, setSubmitStage] = useState<string | null>(null);
   const [userState, setUserState] = useState<UserStateProfile | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -426,23 +427,36 @@ export default function ProfilePage() {
   };
 
   const handleSubmitV2 = async () => {
+    console.log('[Profile Submit] 1. Button clicked', {
+      isSubmitting,
+      timestamp: new Date().toISOString(),
+    });
+
     if (isSubmitting) {
+      console.warn('[Profile Submit] Ignored duplicate click');
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setSubmitStage('正在确认登录状态...');
 
     try {
       localStorage.setItem(PROFILE_DRAFT_KEY, JSON.stringify(profile));
       saveProfile(profile);
 
+      console.log('[Profile Submit] 2. Requesting /api/auth/me');
       const authResponse = await fetch('/api/auth/me', {
         method: 'GET',
         cache: 'no-store',
         credentials: 'include',
       });
       const authResult = await authResponse.json().catch(() => null);
+      console.log('[Profile Submit] 2. /api/auth/me response', {
+        status: authResponse.status,
+        ok: authResponse.ok,
+        hasUser: Boolean(authResult?.user),
+      });
 
       if (!authResponse.ok) {
         throw new Error(authResult?.error || '无法确认登录状态，请稍后重试');
@@ -450,10 +464,13 @@ export default function ProfilePage() {
 
       if (!authResult?.user) {
         setIsSubmitting(false);
+        setSubmitStage(null);
         router.push('/login?from=/profile');
         return;
       }
 
+      setSubmitStage('登录状态正常，正在保存 Profile...');
+      console.log('[Profile Submit] 3. Sending POST /api/profile');
       const response = await fetch('/api/profile', {
         method: 'POST',
         credentials: 'include',
@@ -463,9 +480,17 @@ export default function ProfilePage() {
         body: JSON.stringify(profile),
       });
       const result = await response.json().catch(() => null);
+      console.log('[Profile Submit] 4. POST /api/profile response', {
+        status: response.status,
+        ok: response.ok,
+        success: Boolean(result?.success),
+        hasProfile: Boolean(result?.profile),
+        error: result?.error || null,
+      });
 
       if (response.status === 401) {
         setIsSubmitting(false);
+        setSubmitStage(null);
         router.push('/login?from=/profile');
         return;
       }
@@ -481,9 +506,12 @@ export default function ProfilePage() {
       localStorage.removeItem('futurelens-latest-radar-profile-hash');
       localStorage.removeItem('futurelens-latest-user-state');
 
-      window.location.assign('/radar');
+      setSubmitStage('保存成功，正在进入 Radar...');
+      console.log('[Profile Submit] 5. Executing router.push(/radar)');
+      router.push('/radar');
     } catch (error) {
       console.error('[Profile] Failed to save profile:', error);
+      setSubmitStage(null);
       setSubmitError(error instanceof Error ? error.message : 'Profile 保存失败，请稍后重试');
       setIsSubmitting(false);
     }
@@ -710,6 +738,11 @@ export default function ProfilePage() {
               {submitError && (
                 <p className="text-sm text-[#FF3B30] text-center mt-3">
                   {submitError}
+                </p>
+              )}
+              {submitStage && !submitError && (
+                <p className="text-sm text-[#007AFF] text-center mt-3">
+                  {submitStage}
                 </p>
               )}
               <p className="text-xs text-[#9CA3AF] text-center mt-3">
