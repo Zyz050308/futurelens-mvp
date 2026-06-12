@@ -17,10 +17,11 @@ export async function GET() {
       record: profile || null,
     });
   } catch (error) {
+    console.error('[API/Profile][GET] Failed to load profile:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to load profile',
+        error: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -43,10 +44,11 @@ export async function POST(request: NextRequest) {
       record: saved,
     });
   } catch (error) {
+    console.error('[API/Profile][POST] Failed to save profile:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to save profile',
+        error: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
