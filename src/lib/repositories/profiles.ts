@@ -7,8 +7,8 @@ type ProfileRow = {
   id: string;
   user_id: string;
   profile_json: string | FutureProfile;
-  created_at: Date;
-  updated_at: Date;
+  created_at: Date | string;
+  updated_at: Date | string;
 };
 
 function parseProfile(profileJson: string | FutureProfile): FutureProfile {
@@ -17,13 +17,24 @@ function parseProfile(profileJson: string | FutureProfile): FutureProfile {
     : profileJson;
 }
 
+function toIsoString(value: Date | string): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  const normalized = value.includes('T')
+    ? value
+    : `${value.replace(' ', 'T')}Z`;
+  return new Date(normalized).toISOString();
+}
+
 function mapProfile(row: ProfileRow): ProfileRecord {
   return {
     id: row.id,
     userId: row.user_id,
     profile: parseProfile(row.profile_json),
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString(),
+    createdAt: toIsoString(row.created_at),
+    updatedAt: toIsoString(row.updated_at),
   };
 }
 
@@ -36,28 +47,41 @@ export async function getProfileByUserId(userId: string): Promise<ProfileRecord 
 }
 
 export async function upsertProfile(userId: string, profile: FutureProfile): Promise<ProfileRecord> {
-  const existing = await getProfileByUserId(userId);
+  const id = randomUUID();
   const payload = JSON.stringify(profile);
 
-  if (existing) {
-    await execute(
-      `UPDATE profiles
-       SET profile_json = ?, updated_at = NOW()
-       WHERE user_id = ?`,
-      [payload, userId]
-    );
-  } else {
-    await execute(
-      `INSERT INTO profiles (
-        id, user_id, profile_json, created_at, updated_at
-      ) VALUES (?, ?, ?, NOW(), NOW())`,
-      [randomUUID(), userId, payload]
-    );
+  if (payload === undefined) {
+    throw new Error('Profile cannot be serialized');
   }
 
-  const saved = await getProfileByUserId(userId);
+  await execute(
+    `INSERT INTO profiles (
+      id, user_id, profile_json, created_at, updated_at
+    ) VALUES (?, ?, ?, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE
+      profile_json = VALUES(profile_json),
+      updated_at = NOW()`,
+    [id, userId, payload]
+  );
+
+  const rows = await queryRows<Omit<ProfileRow, 'profile_json'>>(
+    `SELECT id, user_id, created_at, updated_at
+     FROM profiles
+     WHERE user_id = ?
+     LIMIT 1`,
+    [userId]
+  );
+  const saved = rows[0];
+
   if (!saved) {
     throw new Error('Failed to save profile');
   }
-  return saved;
+
+  return {
+    id: saved.id,
+    userId: saved.user_id,
+    profile,
+    createdAt: toIsoString(saved.created_at),
+    updatedAt: toIsoString(saved.updated_at),
+  };
 }
