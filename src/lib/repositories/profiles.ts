@@ -49,6 +49,7 @@ export async function getProfileByUserId(userId: string): Promise<ProfileRecord 
 export async function upsertProfile(userId: string, profile: FutureProfile): Promise<ProfileRecord> {
   const id = randomUUID();
   const payload = JSON.stringify(profile);
+  const savedAt = new Date().toISOString();
 
   if (payload === undefined) {
     throw new Error('Profile cannot be serialized');
@@ -64,24 +65,11 @@ export async function upsertProfile(userId: string, profile: FutureProfile): Pro
     [id, userId, payload]
   );
 
-  const rows = await queryRows<Omit<ProfileRow, 'profile_json'>>(
-    `SELECT id, user_id, created_at, updated_at
-     FROM profiles
-     WHERE user_id = ?
-     LIMIT 1`,
-    [userId]
-  );
-  const saved = rows[0];
-
-  if (!saved) {
-    throw new Error('Failed to save profile');
-  }
-
   return {
-    id: saved.id,
-    userId: saved.user_id,
+    id,
+    userId,
     profile,
-    createdAt: toIsoString(saved.created_at),
-    updatedAt: toIsoString(saved.updated_at),
+    createdAt: savedAt,
+    updatedAt: savedAt,
   };
 }
