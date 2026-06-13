@@ -33,11 +33,24 @@ export type UserState =
   | "entrepreneurship_trial"
   | "study_application"
   | "job_search_push"
+  | "content_execution"
   | "low_energy_survival"
   | "general_exploration";
 
+export type CurrentProblemType =
+  | "exam_deadline"
+  | "career_direction"
+  | "career_security"
+  | "monetization_validation"
+  | "content_publishing"
+  | "information_gap";
+
 export type UserStateProfile = {
   state: UserState;
+  problemType: CurrentProblemType;
+  problemStatement: string;
+  validationQuestion: string;
+  actionDirective: string;
   stateLabel: string;
   oneSentenceDiagnosis: string;
   mainGoal: string;
@@ -106,10 +119,18 @@ function getTimeLevel(weeklyTime?: string): 'low' | 'medium' | 'high' | 'unknown
   if (!weeklyTime) return 'unknown';
   
   const text = weeklyTime.toLowerCase();
-  
-  if (TIME_LOW.some(t => text.includes(t))) return 'low';
+
+  const hours = [...text.matchAll(/\d+(?:\.\d+)?/g)].map(match => Number(match[0]));
+  if (hours.length > 0) {
+    const maxHours = Math.max(...hours);
+    if (maxHours >= 15 || text.includes('以上')) return 'high';
+    if (maxHours >= 5) return 'medium';
+    return 'low';
+  }
+
   if (TIME_HIGH.some(t => text.includes(t))) return 'high';
   if (TIME_MEDIUM.some(t => text.includes(t))) return 'medium';
+  if (TIME_LOW.some(t => text.includes(t))) return 'low';
   
   return 'unknown';
 }
@@ -152,12 +173,48 @@ function mergeProfileFields(profile: FutureProfile): string {
   ].filter(Boolean).join(' ');
 }
 
+function detectCurrentProblem(profile: FutureProfile): CurrentProblemType {
+  const situation = profile.currentSituation?.toLowerCase() || '';
+  const goal = profile.currentGoal?.toLowerCase() || '';
+  const anxiety = profile.currentAnxiety?.toLowerCase() || '';
+  const identity = profile.majorOrCareer?.toLowerCase() || '';
+  const outcome = profile.desiredOutcome?.toLowerCase() || '';
+  const text = [situation, goal, anxiety, identity, outcome].join(' ');
+
+  const hasExam = /(雅思|托福|gre|gmat|考研|考试|备考|分数|单项|总分|申请截止|考试日期)/.test(text);
+  const hasDeadline = /(截止|还有.{0,8}(天|周|月)|\d+(?:\.\d+)?\s*分|目标.{0,8}\d)/.test(text);
+  if (hasExam && (hasDeadline || /(备考|考试|分数)/.test(goal))) {
+    return 'exam_deadline';
+  }
+
+  const hasCreatorContext = /(自媒体|账号|内容|短视频|小红书|抖音|视频|选题|更新|发布)/.test(text);
+  const isBlockedOnPublishing = /(没发|不发|未发布|只发了|发布.{0,8}(少|难)|执行力|拖延|收藏|坚持不了|没有稳定.*发布|总在改定位)/.test(text);
+  if (hasCreatorContext && isBlockedOnPublishing) {
+    return 'content_publishing';
+  }
+
+  if (/(副业|变现|第一笔收入|付费|接单|赚钱|增加收入|客户愿意付)/.test(text)) {
+    return 'monetization_validation';
+  }
+
+  if (/(行业下行|行业下滑|缩招|裁员|失业|就业路径|稳定岗位|职业稳定|被替代|前景|找不到工作)/.test(text)) {
+    return 'career_security';
+  }
+
+  if (/(职业方向|就业方向|求职|找工作|实习|岗位|作品集|转行|转型|第一份工作|选择方向)/.test(text)) {
+    return 'career_direction';
+  }
+
+  return 'information_gap';
+}
+
 // ============================================================
 // 状态判断函数
 // ============================================================
 
 function detectUserState(profile: FutureProfile): UserState {
   const text = mergeProfileFields(profile);
+  const problemType = detectCurrentProblem(profile);
   
   // 获取各维度分数
   const wantMonetization = countMatches(text, WANT_MONETIZATION);
@@ -179,12 +236,26 @@ function detectUserState(profile: FutureProfile): UserState {
   const skillLevel = getSkillLevel(profile.currentSkills);
   
   // 1. 留学/考试申请期（最高优先级之一）
-  if (wantStudy >= 2) {
+  if (problemType === 'exam_deadline' || wantStudy >= 2) {
     return 'study_application';
+  }
+
+  if (problemType === 'content_publishing') {
+    return 'content_execution';
+  }
+
+  if (problemType === 'monetization_validation') {
+    return timeLevel === 'high' && riskLevel !== 'low'
+      ? 'monetization_sprint'
+      : 'monetization_exploration';
+  }
+
+  if (problemType === 'career_security') {
+    return 'career_security_anxiety';
   }
   
   // 2. 求职推进期
-  if (wantJob >= 2) {
+  if (problemType === 'career_direction' && wantJob >= 1) {
     return 'job_search_push';
   }
   
@@ -214,7 +285,7 @@ function detectUserState(profile: FutureProfile): UserState {
   }
   
   // 8. 技能升级期（想提升能力 + 有明确方向）
-  if (wantSkill >= 1 && anxietySkill >= 1 && skillLevel !== 'low') {
+  if ((problemType === 'information_gap' && wantSkill >= 1) || (wantSkill >= 1 && anxietySkill >= 1 && skillLevel !== 'low')) {
     return 'skill_upgrade';
   }
   
@@ -241,13 +312,47 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
   const timeLevel = getTimeLevel(profile.weeklyTime);
   const riskLevel = getRiskLevel(profile.riskPreference);
   const skillLevel = getSkillLevel(profile.currentSkills);
+  const problemType = detectCurrentProblem(profile);
+  const problemDetails: Record<CurrentProblemType, Pick<UserStateProfile, 'problemStatement' | 'validationQuestion' | 'actionDirective'>> = {
+    exam_deadline: {
+      problemStatement: '用户有明确考试目标和时间限制，当前需要定位最拖分的环节，而不是继续收集泛化学习资料。',
+      validationQuestion: '当前哪一个单项或错误类型最可能阻止用户在截止时间前达到目标分数？',
+      actionDirective: '今晚必须完成一次限时诊断、真题小测或可评分练习，得到分数、错误类型或薄弱项；禁止推荐作品集、职业方向、AI工具清单和经验帖。',
+    },
+    career_direction: {
+      problemStatement: '用户需要根据真实岗位或评审标准判断职业方向，而不是跨到无关行业。',
+      validationQuestion: '目标岗位真正重复要求什么，而用户当前缺少哪一项可证明的能力？',
+      actionDirective: '今晚必须查看同领域真实岗位、作品集评审或从业者反馈，形成岗位要求与现有能力的差距；禁止跳到无关行业。',
+    },
+    career_security: {
+      problemStatement: '用户担心行业变化和就业安全，需要比较同领域可进入路径的真实稳定性。',
+      validationQuestion: '哪些同领域岗位仍有持续需求，它们共同要求的证书、工具或经验是什么？',
+      actionDirective: '今晚必须比较同领域真实岗位样本，统计重复要求并选出一个最可进入路径；禁止推荐无关转型、内容账号或泛化AI学习。',
+    },
+    monetization_validation: {
+      problemStatement: '用户想验证副业或收入可能，关键未知是是否有人愿意为一个具体结果付费。',
+      validationQuestion: '哪类真实对象愿意为什么具体结果付出金钱、时间或进一步沟通？',
+      actionDirective: '今晚必须接触真实需求、发布最小服务、询问潜在客户或分析真实付费请求；禁止只提升主业效率、只学习工具或只收藏副业案例。',
+    },
+    content_publishing: {
+      problemStatement: '用户已经有工具和选题，真正阻碍是没有发布并获得真实反馈。',
+      validationQuestion: '用户能否在今晚发布一个最小内容，并获得第一轮观看、互动或发布阻力数据？',
+      actionDirective: '今晚必须完成并发布一条最小内容，或至少进入可公开发布状态；禁止继续搜索、浏览、收藏案例和研究更多工具。',
+    },
+    information_gap: {
+      problemStatement: '用户缺少的不是更多通用信息，而是与自己当前领域直接相关的现实使用场景。',
+      validationQuestion: '用户想学的能力在其真实学习或工作场景中，究竟解决哪一个具体问题？',
+      actionDirective: '今晚必须从本领域岗位、从业者、真实工作流程或具体案例中确认一个使用场景；禁止推荐脱离用户专业的通用工具名单。',
+    },
+  };
+  const currentProblem = problemDetails[problemType];
   
   // 推断 mainGoal
   let mainGoal = '未知目标';
-  if (profile.desiredOutcome) {
-    mainGoal = profile.desiredOutcome;
-  } else if (profile.currentGoal) {
+  if (profile.currentGoal) {
     mainGoal = profile.currentGoal;
+  } else if (profile.desiredOutcome) {
+    mainGoal = profile.desiredOutcome;
   }
   
   // 推断 mainFear
@@ -291,6 +396,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
   switch (state) {
     case 'monetization_exploration':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '变现探索期',
         oneSentenceDiagnosis: '你不是缺能力，而是不知道自己的技能能不能产生收入。',
         mainGoal,
@@ -326,6 +433,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'monetization_sprint':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '变现冲刺期',
         oneSentenceDiagnosis: '你已经有一定能力和时间，现在需要快速验证商业模式。',
         mainGoal,
@@ -362,6 +471,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'career_security_anxiety':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '职业安全焦虑期',
         oneSentenceDiagnosis: '你担心的是未来职业稳定性，需要找到稳定的职业路径。',
         mainGoal,
@@ -398,6 +509,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'direction_confusion':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '方向迷茫期',
         oneSentenceDiagnosis: '你还没有明确方向，不需要急着做长期计划。',
         mainGoal,
@@ -434,6 +547,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'skill_upgrade':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '技能升级期',
         oneSentenceDiagnosis: '你知道自己的技能差距，现在需要系统提升并产出作品。',
         mainGoal,
@@ -470,6 +585,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'career_transition':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '职业转型期',
         oneSentenceDiagnosis: '你想离开当前职业方向，需要用新方向的样本证明自己。',
         mainGoal,
@@ -506,6 +623,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'entrepreneurship_trial':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '创业试探期',
         oneSentenceDiagnosis: '你想做产品或创业，但需要先验证需求是否真实存在。',
         mainGoal,
@@ -542,6 +661,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'study_application':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '留学/考试申请期',
         oneSentenceDiagnosis: '你需要同时准备考试和申请材料，需要任务化的备考策略。',
         mainGoal,
@@ -578,6 +699,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       
     case 'job_search_push':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '求职推进期',
         oneSentenceDiagnosis: '你需要找到工作，需要用作品和简历证明自己的能力。',
         mainGoal,
@@ -611,9 +734,48 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
         ],
         decisionPriority: '这个用户需要用岗位要求反推行动，而不是继续空泛提升。岗位要求才是标准。'
       };
+
+    case 'content_execution':
+      return {
+        problemType,
+        ...currentProblem,
+        stateLabel: '内容发布验证期',
+        oneSentenceDiagnosis: '你现在不缺工具和选题，缺的是发布一次并让真实反馈进入判断。',
+        mainGoal,
+        mainFear,
+        keyConstraint,
+        availableTime: profile.weeklyTime || '未知',
+        riskPreference: profile.riskPreference || '适中',
+        resourceLevel,
+        executionCapacity,
+        decisionLogic: '已有内容能力和素材，但持续停留在准备、改定位或收藏阶段',
+        recommendedStrategy: '缩小内容规模，停止补充资料，今晚完成一次真实发布。',
+        avoidStrategy: '禁止继续收藏案例、研究工具、修改定位或等待完美。',
+        strategyFocus: [
+          '最小内容发布',
+          '获得真实反馈',
+          '识别发布阻力',
+          '建立发布节奏'
+        ],
+        actionBias: [
+          '完成一条内容',
+          '公开发布',
+          '记录观看和互动',
+          '复盘具体卡点'
+        ],
+        forbiddenBias: [
+          '继续收藏案例',
+          '继续研究工具',
+          '反复修改定位',
+          '只写草稿不发布'
+        ],
+        decisionPriority: '这个用户当前的问题是没有发布，不是缺少更多信息。发布结果必须优先于继续准备。'
+      };
       
     case 'low_energy_survival':
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '低能量保守期',
         oneSentenceDiagnosis: '你现在时间和精力都有限，只能做最小行动。',
         mainGoal,
@@ -652,6 +814,8 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
     case 'general_exploration':
     default:
       return {
+        problemType,
+        ...currentProblem,
         stateLabel: '通用探索期',
         oneSentenceDiagnosis: '你的信息还不够充分，需要先补充更多信息才能给出精准建议。',
         mainGoal,
@@ -720,6 +884,7 @@ export function getStateLabel(state: UserState): string {
     entrepreneurship_trial: '创业试探期',
     study_application: '留学/考试申请期',
     job_search_push: '求职推进期',
+    content_execution: '内容发布验证期',
     low_energy_survival: '低能量保守期',
     general_exploration: '通用探索期',
   };

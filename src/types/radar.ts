@@ -259,11 +259,24 @@ export type UserState =
   | "entrepreneurship_trial"
   | "study_application"
   | "job_search_push"
+  | "content_execution"
   | "low_energy_survival"
   | "general_exploration";
 
+export type CurrentProblemType =
+  | "exam_deadline"
+  | "career_direction"
+  | "career_security"
+  | "monetization_validation"
+  | "content_publishing"
+  | "information_gap";
+
 export type UserStateProfile = {
   state: UserState;
+  problemType: CurrentProblemType;
+  problemStatement: string;
+  validationQuestion: string;
+  actionDirective: string;
   stateLabel: string;
   oneSentenceDiagnosis: string;
   mainGoal: string;
@@ -307,5 +320,3 @@ export type ValueMigration = {
   migrationDirection: string;      // 迁移方向（一句话描述）
   urgencyLevel: UrgencyLevel;      // 迁移紧迫度
 };
-
-

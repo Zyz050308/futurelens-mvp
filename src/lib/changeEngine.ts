@@ -305,6 +305,22 @@ function calculateSignalMatchScore(
     profile.currentSituation,
     profile.desiredOutcome,
   ].filter(Boolean).join(' ').toLowerCase();
+
+  const signalDomain =
+    signal.id.startsWith('arch-') ? 'architecture'
+    : signal.id.startsWith('design-') ? 'design'
+    : signal.id.startsWith('finance-') ? 'finance'
+    : signal.id.startsWith('study-') ? 'study_abroad'
+    : signal.id.startsWith('general-') ? 'general'
+    : 'general';
+
+  if (signalDomain === domain) {
+    score += 60;
+    reasons.push('信号与用户领域直接匹配');
+  } else if (signalDomain !== 'general') {
+    score -= 100;
+    reasons.push('信号属于其他专业领域');
+  }
   
   // 1. 检查是否在低相关性领域中
   if (signal.lowRelevanceDomains?.includes(domain)) {
@@ -478,8 +494,8 @@ export function getChangeSignalsForProfile(
  * 生成 profile 的 hash（用于缓存校验）
  */
 export function generateProfileHash(profile: FutureProfile): string {
-  // 简单的字符串化，用于比较是否相同
-  return JSON.stringify(profile);
+  // 生成逻辑升级时递增版本，避免用户继续命中旧 Radar 判断。
+  return `radar-v7.3:${JSON.stringify(profile)}`;
 }
 
 /**

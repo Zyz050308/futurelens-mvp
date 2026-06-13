@@ -1104,7 +1104,7 @@ export default function RadarPage() {
 
       setIsRegenerating(true);
       
-      const changeSignals = getChangeSignalsForProfile(loadedProfile);
+      const changeSignals = getChangeSignalsForProfile(loadedProfile, analyzedState);
       
       const response = await fetch('/api/radar/generate', {
         method: 'POST',

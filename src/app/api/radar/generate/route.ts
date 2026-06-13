@@ -7,6 +7,7 @@ import {
   type UserStateProfile 
 } from '@/lib/insightSelector';
 import { detectBackgroundDomain, detectCurrentTask } from '@/lib/radar';
+import { detectUserDomain } from '@/lib/changeEngine';
 
 export interface GenerateRadarRequest {
   profile: FutureProfile;
@@ -21,16 +22,19 @@ function buildPrompt(profile: FutureProfile, changeSignals: ChangeSignal[], user
 
   // 构建 UserStateProfile
   const backgroundDomain = detectBackgroundDomain(profile);
+  const userDomain = detectUserDomain(profile);
   const currentTask = detectCurrentTask(profile);
   
   // 把 radar.ts 的 BackgroundDomain 转换为 insightLibrary 的 domain
-  let insightDomain: string = 'design'; // 默认
-  if (backgroundDomain === 'design') insightDomain = 'design';
-  else if (backgroundDomain === 'tech') insightDomain = 'ai_product';
-  else if (backgroundDomain === 'business') insightDomain = 'finance';
-  else if (backgroundDomain === 'humanities') insightDomain = 'creator';
-  else if (backgroundDomain === 'learning') insightDomain = 'study_abroad';
-  else if (backgroundDomain === 'unknown') insightDomain = 'design';
+  let insightDomain: string = userDomain;
+  if (userDomain === 'job_transition') {
+    insightDomain = 'general';
+  } else if (userDomain === 'general') {
+    if (backgroundDomain === 'tech') insightDomain = 'ai_product';
+    else if (backgroundDomain === 'business') insightDomain = 'finance';
+    else if (backgroundDomain === 'humanities') insightDomain = 'creator';
+    else if (backgroundDomain === 'learning') insightDomain = 'study_abroad';
+  }
 
   const userStateForInsight: UserStateProfile = {
     domain: insightDomain,
@@ -52,21 +56,46 @@ function buildPrompt(profile: FutureProfile, changeSignals: ChangeSignal[], user
 
   return `【最高优先级】
 
+【当前真正问题强制约束】
+
+userStateProfile.problemType 是本次判断和行动生成的最高优先级，优先于 Insight Library、changeSignals 和职业标签。
+
+- problemType: ${userStateProfile?.problemType || 'information_gap'}
+- problemStatement: ${userStateProfile?.problemStatement || ''}
+- 今晚真正要确认: ${userStateProfile?.validationQuestion || ''}
+- 行动硬约束: ${userStateProfile?.actionDirective || ''}
+
+你必须先回答“今晚要减少哪个未知”，再生成行动。行动必须产生能够改变下一次判断的结果。
+
+禁止把以下行为单独当作验证：
+- 泛泛搜索 AI 工具
+- 浏览经验帖
+- 收藏案例
+- 记录几个工具名称
+- 学习一个与当前问题无关的新工具
+
+只有当搜索对象是真实岗位、真实考试表现、真实付费需求、真实发布反馈或本领域真实工作场景时，搜索才可以出现。
+
+问题类型规则：
+- exam_deadline：只围绕目标分数、截止时间、单项表现和错误类型。禁止作品集、职业方向、AI 工具清单。
+- career_direction：只围绕用户所在或明确考虑的领域，用真实岗位/评审反馈判断方向。禁止跳到无关行业。
+- career_security：比较同领域岗位需求、证书、工具和进入门槛。禁止凭空建议跨行。
+- monetization_validation：验证谁愿意为什么结果付费。禁止只优化主业效率或只学习工具。
+- content_publishing：推动完成并发布最小内容，获取反馈或识别发布阻力。禁止继续收藏案例。
+- information_gap：确认用户本领域中的真实使用场景。禁止推荐脱离专业的通用工具名单。
+
 【V6.3.1 Insight Library 强制要求】
 
-你必须优先使用 Insight Library 提供的洞察作为 CoreInsight，不要自由创造！
+Insight Library 只能作为辅助素材。如果洞察与 problemType、currentSituation 或 validationQuestion 冲突，必须丢弃洞察，基于用户当前问题重新判断。
 
 这是从 Insight Library 为这个用户匹配的个性化洞察：
 ${selectedInsight ? personalizedInsightText : '（未找到匹配洞察，可以自由生成）'}
 
 ${selectedInsight ? `
 【核心规则】
-1. CoreInsight 的"你以为"和"实际上"必须优先使用上面洞察中 personalizedCoreInsight 的内容
-2. 可以适当润色，但不能改变洞察的核心观点
-3. 洞察的引用字段（goal/anxiety/riskPreference/weeklyTime）必须在你的输出中体现
-4. 只有当没有匹配洞察时，你才可以自由生成 CoreInsight
-
-【重要】你必须优先使用这个洞察，而不是自己编造！
+1. 只有洞察与 problemType 和 currentSituation 一致时才可以使用
+2. 不一致时必须以 problemStatement 和 validationQuestion 为准
+3. 洞察的引用字段（goal/anxiety/riskPreference/weeklyTime）必须在输出中体现
 
 洞察原文：
 - id: ${selectedInsight.id}
@@ -87,14 +116,13 @@ ${selectedInsight ? `
 用户档案中的 currentSituation（最近最让你纠结的一件事）是最高优先级信息！
 
 优先级顺序（从高到低）：
-1. profile.currentSituation（用户最近纠结的事）← 这是最高优先级！
-2. userStateProfile.state（用户状态）
-3. userStateProfile.strategyFocus（当前状态下真正应该关注的策略方向）
-4. userStateProfile.actionBias（行动生成时应该优先选择的动作类型）
-5. userStateProfile.forbiddenBias（行动生成时应该避免的动作类型）
-6. 用户 profile 中的时间 / 风险 / 焦虑 / 目标
-7. changeSignals（今日变化信号，作为现实依据）
-8. domain / 职业背景
+1. userStateProfile.problemType / validationQuestion / actionDirective
+2. profile.currentSituation（用户最近纠结的事）
+3. userStateProfile.state（用户状态）
+4. userStateProfile.strategyFocus / actionBias / forbiddenBias
+5. 用户 profile 中的时间 / 风险 / 焦虑 / 目标
+6. changeSignals（只可作为相关现实依据）
+7. domain / 职业背景
 
 也就是说：currentSituation > 用户状态 > 目标焦虑 > 时间风险能力 > 今日变化 > 职业标签
 
@@ -692,6 +720,107 @@ function parseResponse(response: string): OpportunityRadarV4 {
   return safeParseDeepSeekResponse(response);
 }
 
+type ProblemType =
+  | 'exam_deadline'
+  | 'career_direction'
+  | 'career_security'
+  | 'monetization_validation'
+  | 'content_publishing'
+  | 'information_gap';
+
+function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemType) {
+  const field = profile.majorOrCareer || '当前领域';
+
+  switch (problemType) {
+    case 'exam_deadline':
+      return {
+        time: '今晚',
+        task: '完成一次限时诊断，确认当前最拖后腿的单项和错误类型。',
+        reason: `你有明确的考试目标和时间限制。今晚最重要的不是找更多方法，而是确认距离“${profile.currentGoal}”还差在哪里。`,
+        platform: '目标考试的官方真题或你正在使用的真题资料',
+        keywords: '一套可计分的真题或一个完整单项',
+        action: '严格计时完成练习，记录得分，并把错误归为最多的两个类型。',
+        successCriteria: '得到一个真实分数，以及出现次数最多的两个错误类型。',
+      };
+    case 'career_direction':
+      return {
+        time: '今晚',
+        task: `比较 10 个与“${field}”直接相关的真实岗位或实习要求，找出重复出现的能力。`,
+        reason: '方向不能靠行业想象决定，需要先用真实岗位标准判断现有积累和目标之间的差距。',
+        platform: '招聘平台、学校就业信息或目标公司的招聘页面',
+        keywords: `${field} 实习 岗位 招聘`,
+        action: '记录10条岗位中重复出现的3项要求，并标出自己已有证据和缺失证据。',
+        successCriteria: '形成一张包含3项重复要求、已有证据和缺口的对照表。',
+      };
+    case 'career_security':
+      return {
+        time: '今晚',
+        task: `比较 10 个“${field}”相关岗位，确认哪些路径仍有持续需求和清晰进入门槛。`,
+        reason: '你担心的是行业和就业安全，今晚需要的是同领域真实岗位证据，不是跳去另一个行业。',
+        platform: '招聘平台或目标单位官网',
+        keywords: `${field} 稳定岗位 招聘 证书`,
+        action: '统计岗位数量、重复证书/工具要求和经验门槛，选出一个最可进入的路径。',
+        successCriteria: '得到一个候选路径，并列出支持它的至少5条岗位样本和3项重复要求。',
+      };
+    case 'monetization_validation':
+      return {
+        time: '今晚',
+        task: '把你已经会做的一件事写成一个具体结果，向 3 个可能需要它的人确认是否愿意继续了解或付费。',
+        reason: '副业方向的关键不是还能学什么，而是谁愿意为什么结果付钱。',
+        platform: '你能直接接触真实需求的聊天、社群、二手平台或服务平台',
+        keywords: '用户已有能力 + 一个具体交付结果',
+        action: '写出一句服务描述，发给3个潜在对象，询问他们是否有这个问题、现在如何解决、是否愿意进一步沟通。',
+        successCriteria: '获得至少3个真实回应，并记录其中是否出现明确需求、追问或付费信号。',
+      };
+    case 'content_publishing':
+      return {
+        time: '今晚',
+        task: '从已有选题中选一个，做成最低可发布版本并真正发布。',
+        reason: '你已经有工具和素材，当前未知不是还能学什么，而是发布后会得到什么反馈，以及你究竟卡在发布哪一步。',
+        platform: '你已经准备运营的内容账号',
+        keywords: '已有选题中最容易完成的一条',
+        action: '限定30分钟完成标题、正文或视频，停止继续改定位和找案例，到点直接发布。',
+        successCriteria: '内容已经公开发布，并记录发布耗时、第一轮观看/互动数据或最具体的发布阻力。',
+      };
+    case 'information_gap':
+    default:
+      return {
+        time: '今晚',
+        task: `确认你想学的能力在“${field}”真实工作中具体解决哪一个问题。`,
+        reason: '你缺少的是本领域使用场景，而不是另一份通用工具清单。',
+        platform: '本领域真实岗位、从业者访谈、工作流程案例或专业社区',
+        keywords: `${field} + ${profile.currentGoal || '实际工作场景'}`,
+        action: '找到3个真实样本，记录使用场景、解决的问题和是否属于常见需求。',
+        successCriteria: '确认一个重复出现的真实使用场景，并能说清它解决什么问题。',
+      };
+  }
+}
+
+function enforceProblemAlignment(
+  radar: OpportunityRadarV4,
+  profile: FutureProfile,
+  userStateProfile?: { problemType?: ProblemType; validationQuestion?: string }
+): OpportunityRadarV4 {
+  const problemType = userStateProfile?.problemType;
+  if (!problemType) {
+    return radar;
+  }
+
+  const alignedAction = getProblemAlignedAction(profile, problemType);
+  const remainingActions = Array.isArray(radar.actions) ? radar.actions.slice(1) : [];
+
+  return {
+    ...radar,
+    actions: [alignedAction, ...remainingActions],
+    decisionExplanation: radar.decisionExplanation
+      ? {
+          ...radar.decisionExplanation,
+          currentPriority: userStateProfile.validationQuestion || radar.decisionExplanation.currentPriority,
+        }
+      : radar.decisionExplanation,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('[DEBUG] ========== API 调用开始 ==========');
@@ -741,15 +870,18 @@ export async function POST(request: NextRequest) {
 
     // 检测 insightDomain 和 selectedInsight
     const backgroundDomain = detectBackgroundDomain(profile);
+    const userDomain = detectUserDomain(profile);
     const currentTask = detectCurrentTask(profile);
     
-    let insightDomain: string = 'design';
-    if (backgroundDomain === 'design') insightDomain = 'design';
-    else if (backgroundDomain === 'tech') insightDomain = 'ai_product';
-    else if (backgroundDomain === 'business') insightDomain = 'finance';
-    else if (backgroundDomain === 'humanities') insightDomain = 'creator';
-    else if (backgroundDomain === 'learning') insightDomain = 'study_abroad';
-    else if (backgroundDomain === 'unknown') insightDomain = 'design';
+    let insightDomain: string = userDomain;
+    if (userDomain === 'job_transition') {
+      insightDomain = 'general';
+    } else if (userDomain === 'general') {
+      if (backgroundDomain === 'tech') insightDomain = 'ai_product';
+      else if (backgroundDomain === 'business') insightDomain = 'finance';
+      else if (backgroundDomain === 'humanities') insightDomain = 'creator';
+      else if (backgroundDomain === 'learning') insightDomain = 'study_abroad';
+    }
 
     const userStateForInsight: UserStateProfile = {
       domain: insightDomain,
@@ -781,7 +913,12 @@ export async function POST(request: NextRequest) {
     console.log('[DEBUG] DeepSeek API 调用成功，响应长度:', response.length);
 
     // 解析响应（使用 safeParseDeepSeekResponse，不会抛出异常）
-    const radarData = parseResponse(response);
+    const parsedRadarData = parseResponse(response);
+    const radarData = enforceProblemAlignment(
+      parsedRadarData,
+      profile,
+      body.userStateProfile
+    );
 
     // 检查是否是 fallback（解析失败）
     const isFallback = !response.includes('"todayChanges"') && !response.trim().startsWith('{');
