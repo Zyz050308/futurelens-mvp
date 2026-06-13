@@ -6,16 +6,22 @@ import type { ProfileRecord } from '@/types/profile';
 type ProfileRow = {
   id: string;
   user_id: string;
-  profile_json: string;
+  profile_json: string | FutureProfile;
   created_at: Date;
   updated_at: Date;
 };
+
+function parseProfile(profileJson: string | FutureProfile): FutureProfile {
+  return typeof profileJson === 'string'
+    ? (JSON.parse(profileJson) as FutureProfile)
+    : profileJson;
+}
 
 function mapProfile(row: ProfileRow): ProfileRecord {
   return {
     id: row.id,
     userId: row.user_id,
-    profile: JSON.parse(row.profile_json) as FutureProfile,
+    profile: parseProfile(row.profile_json),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
