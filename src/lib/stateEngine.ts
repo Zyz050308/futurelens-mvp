@@ -18,6 +18,7 @@
  */
 
 import type { FutureProfile } from '@/types/radar';
+import { detectCareerActionMode, getCareerActionGuidance } from '@/lib/careerAction';
 
 // ============================================================
 // 类型定义
@@ -345,7 +346,17 @@ function generateStateDetails(state: UserState, profile: FutureProfile): Omit<Us
       actionDirective: '今晚必须从本领域岗位、从业者、真实工作流程或具体案例中确认一个使用场景；禁止推荐脱离用户专业的通用工具名单。',
     },
   };
-  const currentProblem = problemDetails[problemType];
+  let currentProblem = problemDetails[problemType];
+
+  if (problemType === 'career_direction' || problemType === 'career_security') {
+    const careerActionMode = detectCareerActionMode(profile, problemType);
+    const careerGuidance = getCareerActionGuidance(careerActionMode);
+    currentProblem = {
+      ...currentProblem,
+      validationQuestion: careerGuidance.validationQuestion,
+      actionDirective: careerGuidance.actionDirective,
+    };
+  }
   
   // 推断 mainGoal
   let mainGoal = '未知目标';

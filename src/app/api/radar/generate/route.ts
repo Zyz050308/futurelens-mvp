@@ -8,6 +8,10 @@ import {
 } from '@/lib/insightSelector';
 import { detectBackgroundDomain, detectCurrentTask } from '@/lib/radar';
 import { detectUserDomain } from '@/lib/changeEngine';
+import {
+  detectCareerActionMode,
+  type CareerActionMode,
+} from '@/lib/careerAction';
 
 export interface GenerateRadarRequest {
   profile: FutureProfile;
@@ -24,6 +28,11 @@ function buildPrompt(profile: FutureProfile, changeSignals: ChangeSignal[], user
   const backgroundDomain = detectBackgroundDomain(profile);
   const userDomain = detectUserDomain(profile);
   const currentTask = detectCurrentTask(profile);
+  const careerActionMode =
+    userStateProfile?.problemType === 'career_direction'
+    || userStateProfile?.problemType === 'career_security'
+      ? detectCareerActionMode(profile, userStateProfile.problemType)
+      : null;
   
   // 把 radar.ts 的 BackgroundDomain 转换为 insightLibrary 的 domain
   let insightDomain: string = userDomain;
@@ -64,6 +73,7 @@ userStateProfile.problemType 是本次判断和行动生成的最高优先级，
 - problemStatement: ${userStateProfile?.problemStatement || ''}
 - 今晚真正要确认: ${userStateProfile?.validationQuestion || ''}
 - 行动硬约束: ${userStateProfile?.actionDirective || ''}
+${careerActionMode ? `- careerActionMode: ${careerActionMode}` : ''}
 
 你必须先回答“今晚要减少哪个未知”，再生成行动。行动必须产生能够改变下一次判断的结果。
 
@@ -78,8 +88,10 @@ userStateProfile.problemType 是本次判断和行动生成的最高优先级，
 
 问题类型规则：
 - exam_deadline：只围绕目标分数、截止时间、单项表现和错误类型。禁止作品集、职业方向、AI 工具清单。
-- career_direction：只围绕用户所在或明确考虑的领域，用真实岗位/评审反馈判断方向。禁止跳到无关行业。
-- career_security：比较同领域岗位需求、证书、工具和进入门槛。禁止凭空建议跨行。
+- career_direction / career_security：先依据 careerActionMode 决定验证方式，禁止统一生成“比较10个岗位”。
+  - portfolio_feedback：把现有作品或案例交给真实同行、招聘者、老师或目标用户，获取具体评审反馈。
+  - real_scene_trial：选择一个真实工作问题，小规模测试新工具或方法是否产生可观察改善。
+  - industry_path_comparison：比较同领域3条不同工作路径，而不是统计一批相似岗位。
 - monetization_validation：验证谁愿意为什么结果付费。禁止只优化主业效率或只学习工具。
 - content_publishing：推动完成并发布最小内容，获取反馈或识别发布阻力。禁止继续收藏案例。
 - information_gap：确认用户本领域中的真实使用场景。禁止推荐脱离专业的通用工具名单。
@@ -728,6 +740,43 @@ type ProblemType =
   | 'content_publishing'
   | 'information_gap';
 
+function getCareerAlignedAction(profile: FutureProfile, mode: CareerActionMode) {
+  const field = profile.majorOrCareer || '当前领域';
+
+  switch (mode) {
+    case 'portfolio_feedback':
+      return {
+        time: '今晚',
+        task: '选出一份最能代表你当前能力的作品或案例，交给 3 位真实评审者获得具体反馈。',
+        reason: '方向判断不能只靠岗位描述。你需要知道现有成果在真实评审标准下，究竟哪里已经成立、哪里仍然不足。',
+        platform: '你能联系到的同行、招聘者、老师、从业者或目标用户',
+        keywords: '一份现有作品 + 3个具体评审问题',
+        action: `发送作品时只问三个问题：它是否证明我能胜任“${profile.currentGoal || field}”；最影响认可的一处是什么；如果只改一处应该改哪里。`,
+        successCriteria: '获得至少1条指出具体问题和修改方向的真实反馈，而不是只有“不错”“继续加油”。',
+      };
+    case 'real_scene_trial':
+      return {
+        time: '今晚',
+        task: `从“${field}”的真实学习或工作流程中，选一个可以复现的小问题，测试新工具或方法是否真的有用。`,
+        reason: '你当前需要确认的不是还能学什么，而是新工具能否解决本领域一个具体、重复出现的问题。',
+        platform: '一个真实工作案例、可复现流程或现场问题，以及你正在考虑的新工具或方法',
+        keywords: '一个具体问题 + 一次前后对照',
+        action: '先用原方法记录耗时或结果，再用新方法完成同一小问题，记录改善、失败点和仍需人工判断的部分。',
+        successCriteria: '得到一次可比较的试用结果，并能明确判断这个方法值得继续、需要调整或不适合。',
+      };
+    case 'industry_path_comparison':
+      return {
+        time: '今晚',
+        task: `列出“${field}”内 3 条真实工作路径，比较它们的工作内容、进入门槛和需求稳定性。`,
+        reason: '行业焦虑不能通过堆积相似岗位缓解。你需要看清同一领域内部不同路径的差异，以及已有积累能迁移到哪里。',
+        platform: '每条路径各选一个真实从业者、招聘信息、目标单位或工作案例',
+        keywords: `${field} + 3条不同工作路径`,
+        action: '为每条路径各记录一个真实样本，对比日常工作、进入门槛、需求稳定性、成长空间和你已有能力的可迁移程度。',
+        successCriteria: '排除至少1条明显不适合的路径，并选出1条最值得继续验证的候选路径及其理由。',
+      };
+  }
+}
+
 function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemType) {
   const field = profile.majorOrCareer || '当前领域';
 
@@ -743,25 +792,11 @@ function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemTyp
         successCriteria: '得到一个真实分数，以及出现次数最多的两个错误类型。',
       };
     case 'career_direction':
-      return {
-        time: '今晚',
-        task: `比较 10 个与“${field}”直接相关的真实岗位或实习要求，找出重复出现的能力。`,
-        reason: '方向不能靠行业想象决定，需要先用真实岗位标准判断现有积累和目标之间的差距。',
-        platform: '招聘平台、学校就业信息或目标公司的招聘页面',
-        keywords: `${field} 实习 岗位 招聘`,
-        action: '记录10条岗位中重复出现的3项要求，并标出自己已有证据和缺失证据。',
-        successCriteria: '形成一张包含3项重复要求、已有证据和缺口的对照表。',
-      };
     case 'career_security':
-      return {
-        time: '今晚',
-        task: `比较 10 个“${field}”相关岗位，确认哪些路径仍有持续需求和清晰进入门槛。`,
-        reason: '你担心的是行业和就业安全，今晚需要的是同领域真实岗位证据，不是跳去另一个行业。',
-        platform: '招聘平台或目标单位官网',
-        keywords: `${field} 稳定岗位 招聘 证书`,
-        action: '统计岗位数量、重复证书/工具要求和经验门槛，选出一个最可进入的路径。',
-        successCriteria: '得到一个候选路径，并列出支持它的至少5条岗位样本和3项重复要求。',
-      };
+      return getCareerAlignedAction(
+        profile,
+        detectCareerActionMode(profile, problemType)
+      );
     case 'monetization_validation':
       return {
         time: '今晚',
