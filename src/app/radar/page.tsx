@@ -12,6 +12,7 @@ import FutureSelfAvatar from '@/components/FutureSelfAvatar';
 
 type VerificationPhase = 'idle' | 'started' | 'recording' | 'recorded';
 type VerificationCategory = 'customer' | 'job' | 'study' | 'direction' | 'general';
+type VerificationType = NonNullable<ActionItem['verificationType']>;
 
 type EvidenceRecord = DiscoveryRecord;
 
@@ -32,6 +33,22 @@ type VerificationContext = {
   options: ResultOption[];
 };
 
+function inferVerificationType(text: string): VerificationType | null {
+  if (/(真实评审|评审者|作品反馈|作品或案例|最影响认可|只改一处)/.test(text)) {
+    return 'portfolio_feedback';
+  }
+  if (/(前后对照|新工具或方法|真实工作问题|可复现的小问题|试用结果)/.test(text)) {
+    return 'real_scene_trial';
+  }
+  if (/(3条不同工作路径|3 条真实工作路径|三条工作路径|路径各选一个真实样本)/.test(text)) {
+    return 'industry_path_comparison';
+  }
+  if (/(发布一个最小内容|最低可发布|到点直接发布)/.test(text)) {
+    return 'content_publish';
+  }
+  return null;
+}
+
 function getVerificationContext(action?: ActionItem): VerificationContext {
   const text = [
     action?.task,
@@ -41,8 +58,73 @@ function getVerificationContext(action?: ActionItem): VerificationContext {
     action?.action,
     action?.successCriteria,
   ].filter(Boolean).join(' ').toLowerCase();
+  const verificationType = action?.verificationType || inferVerificationType(text);
 
-  if (/(客户|询价|付费|接单|需求|服务|用户访谈|商家)/.test(text)) {
+  if (verificationType === 'portfolio_feedback') {
+    return {
+      category: 'job',
+      goal: '你的作品在真实评审标准下，最影响认可或岗位匹配的问题是什么。',
+      why: '继续独自修改只能增加完成度，真实评审才能告诉你作品是否证明了目标岗位需要的能力。',
+      resultPlaceholder: '记录评审者指出的具体问题、岗位匹配度和最值得强化的方向。',
+      options: [
+        { code: 'positive_feedback', label: '获得正向反馈', judgment: '作品已有一部分价值被真实评审者认可。', nextUnknown: '这份认可来自表达完成度，还是确实证明了目标岗位需要的能力？', nextAction: '追问评审者：作品中最能证明你能力的是哪一部分，以及为什么。', identitySignal: '正在成为能够用作品证明能力的人' },
+        { code: 'clear_problem', label: '被指出明显问题', judgment: '真实评审暴露了一个具体问题，下一步不再需要盲目修改。', nextUnknown: '这个问题是单个作品的问题，还是整个作品集反复出现的问题？', nextAction: '检查另外两份作品，确认同类问题是否重复出现。', identitySignal: '正在形成根据专业反馈改进作品的能力' },
+        { code: 'role_mismatch', label: '作品不匹配岗位', judgment: '当前作品与目标岗位的判断标准没有建立足够连接。', nextUnknown: '需要调整目标岗位，还是补一份更能证明关键能力的作品？', nextAction: '让评审者指出目标岗位最缺的一项证明，并确定一个最小补充案例。', identitySignal: '正在形成用岗位标准选择作品的能力' },
+        { code: 'stronger_direction', label: '发现可强化方向', judgment: '作品中出现了值得继续放大的能力信号。', nextUnknown: '这个优势能否在更多作品和真实岗位反馈中重复成立？', nextAction: '选另一份作品，用同一能力线索重新组织表达并再次获得反馈。', identitySignal: '正在形成识别并强化个人优势的能力' },
+        { code: 'reframe_needed', label: '需要重新调整表达', judgment: '能力可能存在，但当前呈现方式没有让评审者清楚看见。', nextUnknown: '缺失的是背景、判断过程，还是结果证据？', nextAction: '只重写一个案例的“问题、判断、结果”三部分，再交给同一评审者复看。', identitySignal: '正在形成把能力转化为可见证据的能力' },
+      ],
+    };
+  }
+
+  if (verificationType === 'real_scene_trial') {
+    return {
+      category: 'general',
+      goal: '这个工具或新方法，在真实工作问题中究竟能解决什么、不能解决什么。',
+      why: '工具是否值得继续学，不取决于功能清单，而取决于它在真实流程中产生了什么可观察结果。',
+      resultPlaceholder: '记录测试的真实问题、前后差异、失败点和新的学习线索。',
+      options: [
+        { code: 'real_use_case', label: '找到真实使用场景', judgment: '这个方法已经连接到一个具体工作问题，值得继续验证。', nextUnknown: '这个场景是否重复出现，改善是否足以改变原有流程？', nextAction: '在第二个相似案例中复现同样测试，比较结果是否稳定。', identitySignal: '正在形成把新工具连接到真实工作的能力' },
+        { code: 'practitioner_uses_it', label: '从业者确实在用', judgment: '真实从业者的使用证明这个方向不是凭空想象。', nextUnknown: '他们在什么条件下使用，又保留了哪些人工判断？', nextAction: '追问一位使用者，记录适用条件、限制和最常见的失败情况。', identitySignal: '正在形成从真实实践中判断学习方向的能力' },
+        { code: 'assist_only', label: '只能辅助，不能解决核心问题', judgment: '测试明确了工具的边界：它能提升局部效率，但不能替代核心专业判断。', nextUnknown: '最值得保留的辅助环节是哪一步？', nextAction: '把工具限制在一个低风险环节，再测试它能节省多少时间或减少多少错误。', identitySignal: '正在形成识别工具边界的专业判断力' },
+        { code: 'no_practical_value', label: '暂时没有实际价值', judgment: '当前工具或方法没有改善这个真实问题，可以停止无效投入。', nextUnknown: '问题在工具不适合，还是选择的场景不具代表性？', nextAction: '换一个更常见的小问题做最后一次验证；仍无改善就排除这个方向。', identitySignal: '正在形成用结果停止无效学习的能力' },
+        { code: 'new_learning_direction', label: '发现新的学习方向', judgment: '真实测试暴露了一个比原计划更具体的能力缺口。', nextUnknown: '这个新能力是否会直接改善真实工作结果？', nextAction: '围绕新缺口完成一个最小练习，并回到同一场景再次测试。', identitySignal: '正在形成由真实问题驱动学习的能力' },
+      ],
+    };
+  }
+
+  if (verificationType === 'industry_path_comparison') {
+    return {
+      category: 'direction',
+      goal: '同一行业的不同路径中，哪条更符合你的积累、限制和对稳定性的要求。',
+      why: '行业不是一个整体。比较不同工作路径，才能把笼统的行业焦虑变成可排除、可继续验证的选择。',
+      resultPlaceholder: '记录三条路径的真实差异、被排除的选项和最值得继续验证的候选路径。',
+      options: [
+        { code: 'clear_candidate', label: '出现明确候选路径', judgment: '一条路径在进入门槛、稳定性和现有积累之间形成了更好的匹配。', nextUnknown: '这条路径的真实日常工作是否也适合你？', nextAction: '联系一位该路径从业者，确认日常工作、最难部分和新人进入方式。', identitySignal: '正在形成基于现实差异选择职业路径的能力' },
+        { code: 'path_excluded', label: '排除了一条路径', judgment: '你减少了一个不适合的选项，判断范围已经收窄。', nextUnknown: '剩余路径中最关键的差异是什么？', nextAction: '只比较剩余两条路径最影响你的一个维度。', identitySignal: '正在成为能够用证据排除错误路径的人' },
+        { code: 'tradeoff_found', label: '发现关键取舍', judgment: '不同路径没有绝对优劣，但核心取舍已经变得清楚。', nextUnknown: '你愿意用什么交换稳定、成长或收入？', nextAction: '按你的优先级给三个取舍维度排序，并据此重新比较路径。', identitySignal: '正在形成理解职业选择代价的能力' },
+        { code: 'evidence_insufficient', label: '证据仍然不足', judgment: '当前样本没有提供足够区分度，还不能支持路径选择。', nextUnknown: '缺少的是工作内容、进入门槛，还是稳定性证据？', nextAction: '只补充最缺失的一个维度，并寻找一个更真实的样本。', identitySignal: '正在形成识别职业判断证据缺口的能力' },
+        { code: 'new_path', label: '发现新的行业路径', judgment: '比较过程出现了原先没有考虑、但可能更匹配的路径。', nextUnknown: '新路径是真的更适合，还是只是信息新鲜？', nextAction: '用相同维度把新路径与当前候选路径做一次对照。', identitySignal: '正在形成开放但不盲目的路径判断能力' },
+      ],
+    };
+  }
+
+  if (verificationType === 'content_publish') {
+    return {
+      category: 'general',
+      goal: '你能否真正发布最小内容，并从发布结果中获得第一轮反馈。',
+      why: '当前未知不是还能准备什么，而是内容发布后会发生什么，以及你真正卡在哪一步。',
+      resultPlaceholder: '记录是否发布、第一轮数据、收到的反馈或最具体的发布阻力。',
+      options: [
+        { code: 'published', label: '已经发布', judgment: '你已经越过发布门槛，接下来可以用真实数据而不是想象改进内容。', nextUnknown: '第一轮数据反映的是选题、表达还是分发问题？', nextAction: '记录24小时数据，只选择一个最明显的问题进行下一次调整。', identitySignal: '正在成为能够通过发布获得反馈的人' },
+        { code: 'engagement', label: '获得真实互动', judgment: '内容已经引发真实回应，说明其中有值得继续验证的信号。', nextUnknown: '互动来自哪一个具体观点或表达？', nextAction: '围绕互动最集中的一点做一条更具体的后续内容。', identitySignal: '正在形成根据真实互动选择内容方向的能力' },
+        { code: 'low_response', label: '发布但反馈很少', judgment: '这次发布没有形成明显反馈，但它提供了真实基线。', nextUnknown: '问题更可能出在选题、开头表达，还是触达不足？', nextAction: '保持主题不变，只调整一个变量后再次发布。', identitySignal: '正在形成用数据迭代内容的能力' },
+        { code: 'blocked', label: '仍然没有发布', judgment: '真正阻力已经从“内容不够好”变成了一个具体的发布障碍。', nextUnknown: '最后阻止发布的是完成度要求、被评价的恐惧，还是流程过大？', nextAction: '把内容缩小到15分钟可完成版本，并删除一个非必要步骤。', identitySignal: '正在形成识别并降低行动门槛的能力' },
+        { code: 'new_discovery', label: '发现新的内容方向', judgment: '发布过程暴露了一个比原计划更值得验证的内容线索。', nextUnknown: '这个新方向是否能再次获得真实互动？', nextAction: '围绕新线索发布一条最小后续内容。', identitySignal: '正在形成从发布结果中发现方向的能力' },
+      ],
+    };
+  }
+
+  if (verificationType === 'customer_validation' || /(客户|询价|付费|接单|需求|服务|用户访谈|商家)/.test(text)) {
     return {
       category: 'customer',
       goal: '真实需求是否存在，以及对方是否愿意继续了解你的方案。',
@@ -51,14 +133,14 @@ function getVerificationContext(action?: ActionItem): VerificationContext {
       options: [
         { code: 'interested', label: '有人感兴趣', judgment: '真实需求得到了初步支持，但还不能确认是否愿意付费。', nextUnknown: '对方愿意为什么具体结果付出时间或金钱？', nextAction: '追问一位感兴趣的人：他最希望先解决哪个具体问题。', identitySignal: '正在成为能够主动接触真实需求的人' },
         { code: 'asked_price', label: '有人询价', judgment: '需求不仅存在，而且已经出现了初步付费信号。', nextUnknown: '这个付费信号能否再次出现？', nextAction: '用同样的服务表达再接触一位相似对象，确认询价是否可重复。', identitySignal: '正在形成把能力连接到真实需求的能力' },
+        { code: 'willing_to_pay', label: '愿意付费', judgment: '真实需求已经形成明确付费证据。', nextUnknown: '这个付费意愿能否在相似对象中重复出现，并形成可交付边界？', nextAction: '确认交付范围、价格和开始条件，并再找一位相似对象验证。', identitySignal: '正在成为能够用真实交易证明能力价值的人' },
         { code: 'rejected', label: '被拒绝', judgment: '当前对象或表达没有建立连接，但一次拒绝还不足以否定方向。', nextUnknown: '拒绝来自没有需求，还是你的表达没有说中问题？', nextAction: '换一位对象，并把询问改成只确认对方最困扰的问题。', identitySignal: '正在形成从拒绝中修正方向的能力' },
         { code: 'no_reply', label: '无人回复', judgment: '当前触达方式没有获得反馈，原判断暂时无法成立。', nextUnknown: '问题出在对象、渠道，还是开场表达？', nextAction: '更换一个渠道或对象，再发出一条更具体的询问。', identitySignal: '正在形成低成本测试真实需求的习惯' },
-        { code: 'new_discovery', label: '出现新的发现', judgment: '现实暴露了原判断之外的新线索，需要先理解这个变化。', nextUnknown: '这个新发现是偶然情况，还是更重要的真实问题？', nextAction: '围绕新发现再问一个具体对象，确认它是否重复出现。', identitySignal: '正在形成从现实反馈中发现问题的能力' },
       ],
     };
   }
 
-  if (/(岗位|招聘|简历|面试|投递|offer|求职|jd)/.test(text)) {
+  if (verificationType === 'job_validation' || /(岗位|招聘|简历|面试|投递|offer|求职|jd)/.test(text)) {
     return {
       category: 'job',
       goal: '你的当前经历是否已经达到目标岗位的真实要求。',
@@ -74,7 +156,7 @@ function getVerificationContext(action?: ActionItem): VerificationContext {
     };
   }
 
-  if (/(雅思|托福|备考|考试|学习方案|课程|真题|复习|申请)/.test(text)) {
+  if (verificationType === 'exam_diagnostic' || /(雅思|托福|备考|考试|学习方案|课程|真题|复习|申请)/.test(text)) {
     return {
       category: 'study',
       goal: '是否存在一个符合你当前时间和问题的可执行方案。',
@@ -90,7 +172,7 @@ function getVerificationContext(action?: ActionItem): VerificationContext {
     };
   }
 
-  if (/(方向|转行|选择|比较|测试|尝试)/.test(text)) {
+  if (verificationType === 'direction_test' || /(方向|转行|选择|比较|测试|尝试)/.test(text)) {
     return {
       category: 'direction',
       goal: '这个方向是否值得你继续投入下一轮时间。',
@@ -132,6 +214,15 @@ function getVerificationContextForCategory(
   category: VerificationCategory,
   fallbackAction: string
 ): VerificationContext {
+  if (inferVerificationType(fallbackAction)) {
+    return getVerificationContext({
+      time: '今晚',
+      task: fallbackAction,
+      reason: '',
+      successCriteria: '',
+    });
+  }
+
   const categoryHints: Record<VerificationCategory, string> = {
     customer: '客户需求询价',
     job: '求职岗位面试',

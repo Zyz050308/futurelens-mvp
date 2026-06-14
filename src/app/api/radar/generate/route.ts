@@ -747,6 +747,7 @@ function getCareerAlignedAction(profile: FutureProfile, mode: CareerActionMode) 
     case 'portfolio_feedback':
       return {
         time: '今晚',
+        verificationType: 'portfolio_feedback' as const,
         task: '选出一份最能代表你当前能力的作品或案例，交给 3 位真实评审者获得具体反馈。',
         reason: '方向判断不能只靠岗位描述。你需要知道现有成果在真实评审标准下，究竟哪里已经成立、哪里仍然不足。',
         platform: '你能联系到的同行、招聘者、老师、从业者或目标用户',
@@ -757,6 +758,7 @@ function getCareerAlignedAction(profile: FutureProfile, mode: CareerActionMode) 
     case 'real_scene_trial':
       return {
         time: '今晚',
+        verificationType: 'real_scene_trial' as const,
         task: `从“${field}”的真实学习或工作流程中，选一个可以复现的小问题，测试新工具或方法是否真的有用。`,
         reason: '你当前需要确认的不是还能学什么，而是新工具能否解决本领域一个具体、重复出现的问题。',
         platform: '一个真实工作案例、可复现流程或现场问题，以及你正在考虑的新工具或方法',
@@ -767,6 +769,7 @@ function getCareerAlignedAction(profile: FutureProfile, mode: CareerActionMode) 
     case 'industry_path_comparison':
       return {
         time: '今晚',
+        verificationType: 'industry_path_comparison' as const,
         task: `列出“${field}”内 3 条真实工作路径，比较它们的工作内容、进入门槛和需求稳定性。`,
         reason: '行业焦虑不能通过堆积相似岗位缓解。你需要看清同一领域内部不同路径的差异，以及已有积累能迁移到哪里。',
         platform: '每条路径各选一个真实从业者、招聘信息、目标单位或工作案例',
@@ -784,6 +787,7 @@ function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemTyp
     case 'exam_deadline':
       return {
         time: '今晚',
+        verificationType: 'exam_diagnostic' as const,
         task: '完成一次限时诊断，确认当前最拖后腿的单项和错误类型。',
         reason: `你有明确的考试目标和时间限制。今晚最重要的不是找更多方法，而是确认距离“${profile.currentGoal}”还差在哪里。`,
         platform: '目标考试的官方真题或你正在使用的真题资料',
@@ -800,6 +804,7 @@ function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemTyp
     case 'monetization_validation':
       return {
         time: '今晚',
+        verificationType: 'customer_validation' as const,
         task: '把你已经会做的一件事写成一个具体结果，向 3 个可能需要它的人确认是否愿意继续了解或付费。',
         reason: '副业方向的关键不是还能学什么，而是谁愿意为什么结果付钱。',
         platform: '你能直接接触真实需求的聊天、社群、二手平台或服务平台',
@@ -810,6 +815,7 @@ function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemTyp
     case 'content_publishing':
       return {
         time: '今晚',
+        verificationType: 'content_publish' as const,
         task: '从已有选题中选一个，做成最低可发布版本并真正发布。',
         reason: '你已经有工具和素材，当前未知不是还能学什么，而是发布后会得到什么反馈，以及你究竟卡在发布哪一步。',
         platform: '你已经准备运营的内容账号',
@@ -821,6 +827,7 @@ function getProblemAlignedAction(profile: FutureProfile, problemType: ProblemTyp
     default:
       return {
         time: '今晚',
+        verificationType: 'real_scene_trial' as const,
         task: `确认你想学的能力在“${field}”真实工作中具体解决哪一个问题。`,
         reason: '你缺少的是本领域使用场景，而不是另一份通用工具清单。',
         platform: '本领域真实岗位、从业者访谈、工作流程案例或专业社区',

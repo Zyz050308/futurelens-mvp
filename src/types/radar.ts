@@ -212,6 +212,16 @@ export type ActionItem = {
   task: string;
   reason: string;
   successCriteria: string;
+  verificationType?:
+    | 'portfolio_feedback'
+    | 'real_scene_trial'
+    | 'industry_path_comparison'
+    | 'customer_validation'
+    | 'job_validation'
+    | 'exam_diagnostic'
+    | 'content_publish'
+    | 'direction_test'
+    | 'general';
   platform?: string;  // V6.6 新增：今晚任务需要打开的平台
   keywords?: string;  // V6.6 新增：今晚任务需要搜索的关键词
   action?: string;  // V6.6 新增：今晚任务需要完成的具体动作
