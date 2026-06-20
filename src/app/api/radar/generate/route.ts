@@ -12,6 +12,7 @@ import {
   detectCareerActionMode,
   type CareerActionMode,
 } from '@/lib/careerAction';
+import { ensureSolutionPack } from '@/lib/solutionPack';
 
 export interface GenerateRadarRequest {
   profile: FutureProfile;
@@ -549,6 +550,77 @@ JSON格式：
       "successCriteria": "完成标准"
     }
   ],
+  "solutionPack": {
+    "problemSummary": {
+      "userOriginalProblem": "用户原始问题",
+      "interpretedProblem": "系统理解后的问题",
+      "missingInformation": ["还缺什么关键信息"]
+    },
+    "problemShape": "learn_capability | build_workflow | create_output | make_decision | validate_opportunity | solve_specific_task",
+    "coreObstacle": {
+      "summary": "当前真正阻碍",
+      "whyItBlocksProgress": "为什么它阻止推进",
+      "evidenceFromContext": ["来自用户上下文的证据"]
+    },
+    "targetOutcome": {
+      "desiredResult": "用户想达成的结果",
+      "successDefinition": "什么算成功",
+      "timeConstraint": "时间限制"
+    },
+    "solutionPath": [
+      {
+        "order": 1,
+        "step": "阶段步骤",
+        "purpose": "为什么做",
+        "expectedOutput": "这一步产出什么"
+      }
+    ],
+    "requiredCapabilities": [
+      {
+        "capability": "generate_learning_plan | generate_exercises | generate_document | generate_table | generate_workflow | generate_prompt_template | generate_checklist | generate_review_form | generate_message_template | compare_options | run_validation_design | track_task | update_plan_from_feedback",
+        "reason": "为什么需要这个能力",
+        "priority": "high | medium | low"
+      }
+    ],
+    "materials": [
+      {
+        "id": "material-1",
+        "type": "learning_plan | exercise_set | explanation | document_template | table | workflow | prompt_template | checklist | review_form | script | message_template",
+        "title": "执行材料标题",
+        "purpose": "这份材料帮用户做什么",
+        "content": "可直接使用的材料正文",
+        "usageInstruction": "今晚如何使用它"
+      }
+    ],
+    "todayTask": {
+      "title": "今日任务标题",
+      "task": "今日任务内容",
+      "estimatedTime": "预计时间",
+      "requiredMaterialIds": ["material-1"],
+      "executionSteps": ["执行步骤"]
+    },
+    "completionCriteria": {
+      "minimumDone": "最低完成标准",
+      "goodEnoughResult": "什么结果算足够好",
+      "evidenceToRecord": "用户完成后要记录什么"
+    },
+    "feedbackQuestions": [
+      {
+        "key": "actual_result",
+        "question": "反馈问题",
+        "answerType": "text | choice | number | boolean",
+        "options": ["可选项"]
+      }
+    ],
+    "nextAdjustmentLogic": [
+      {
+        "condition": "如果出现什么结果",
+        "interpretation": "说明什么",
+        "nextMove": "下一步怎么调整",
+        "capabilityToUseNext": "update_plan_from_feedback"
+      }
+    ]
+  },
   "futureSelfMessage": "未来分身给现在用户的提醒，必须引用变化→影响→行动，不要空泛，200字以内"
 }
 
@@ -864,9 +936,12 @@ function enforceProblemAlignment(
 }
 
 export async function POST(request: NextRequest) {
+  let requestBody: GenerateRadarRequest | null = null;
+
   try {
     console.log('[DEBUG] ========== API 调用开始 ==========');
     const body: GenerateRadarRequest = await request.json();
+    requestBody = body;
     const { profile, changeSignals } = body;
 
     console.log('[DEBUG] 用户 profile:', JSON.stringify({
@@ -956,8 +1031,13 @@ export async function POST(request: NextRequest) {
 
     // 解析响应（使用 safeParseDeepSeekResponse，不会抛出异常）
     const parsedRadarData = parseResponse(response);
-    const radarData = enforceProblemAlignment(
+    const alignedRadarData = enforceProblemAlignment(
       parsedRadarData,
+      profile,
+      body.userStateProfile
+    );
+    const radarData = ensureSolutionPack(
+      alignedRadarData,
       profile,
       body.userStateProfile
     );
@@ -975,11 +1055,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API/Radar/Generate] 生成失败:', error);
-    
+
+    const fallbackRadar = requestBody?.profile
+      ? ensureSolutionPack(
+          createFallbackRadar(),
+          requestBody.profile,
+          requestBody.userStateProfile
+        )
+      : createFallbackRadar();
+
     // 发生错误时也返回 fallback，而不是 500
     return NextResponse.json({
       success: true,
-      data: createFallbackRadar(),
+      data: fallbackRadar,
       isFallback: true
     });
   }

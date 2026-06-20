@@ -7,7 +7,7 @@ import { loadProfile } from '@/lib/radar';
 import { getChangeSignalsForProfile, generateProfileHash } from '@/lib/changeEngine';
 import { analyzeUserState } from '@/lib/stateEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
-import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight } from '@/types/radar';
+import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, ProblemShape } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
 
 type VerificationPhase = 'idle' | 'started' | 'recording' | 'recorded';
@@ -490,11 +490,20 @@ function TonightActionCard({ action, phase, onStart, onRecord }: TonightActionCa
 interface RecordDiscoveryCardProps {
   action: ActionItem;
   context: VerificationContext;
+  error: string | null;
+  isSubmitting: boolean;
   onCancel: () => void;
-  onSubmit: (result: { outcome: ResultOption; userResult: string; userDiscovery: string }) => void;
+  onSubmit: (result: { outcome: ResultOption; userResult: string; userDiscovery: string }) => Promise<void>;
 }
 
-function RecordDiscoveryCard({ action, context, onCancel, onSubmit }: RecordDiscoveryCardProps) {
+function RecordDiscoveryCard({
+  action,
+  context,
+  error,
+  isSubmitting,
+  onCancel,
+  onSubmit,
+}: RecordDiscoveryCardProps) {
   const [outcomeCode, setOutcomeCode] = useState(context.options[0]?.code || '');
   const [result, setResult] = useState('');
   const [discovery, setDiscovery] = useState('');
@@ -562,17 +571,25 @@ function RecordDiscoveryCard({ action, context, onCancel, onSubmit }: RecordDisc
         />
       </label>
 
+      {error && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#FF3B30]/20 bg-[#FF3B30]/5 px-4 py-3 text-sm text-[#C9342D]">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>保存失败：{error}</span>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <button
           type="button"
           onClick={onCancel}
+          disabled={isSubmitting}
           className="h-12 px-5 rounded-xl border border-[#E5E7EB] text-sm font-medium text-[#6B7280] hover:bg-[#F7F7F8]"
         >
           稍后记录
         </button>
         <button
           type="button"
-          disabled={!canSubmit || !selectedOutcome}
+          disabled={!canSubmit || !selectedOutcome || isSubmitting}
           onClick={() => selectedOutcome && onSubmit({
             outcome: selectedOutcome,
             userResult: result.trim(),
@@ -580,7 +597,7 @@ function RecordDiscoveryCard({ action, context, onCancel, onSubmit }: RecordDisc
           })}
           className="h-12 flex-1 rounded-xl bg-[#1D1D1F] text-white text-sm font-semibold hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          更新判断
+          {isSubmitting ? '正在保存...' : '更新判断'}
         </button>
       </div>
     </section>
@@ -652,6 +669,111 @@ function RecentDiscoveriesCard({ records }: RecentDiscoveriesCardProps) {
             )}
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+interface SolutionPackPreviewCardProps {
+  solutionPack?: SolutionPack;
+}
+
+const problemShapeLabels: Record<ProblemShape, string> = {
+  learn_capability: '学习一个能力',
+  build_workflow: '搭建一个工作流',
+  create_output: '完成一个具体产出',
+  make_decision: '做出一个选择',
+  validate_opportunity: '验证一个机会',
+  solve_specific_task: '解决一个具体任务',
+};
+
+function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps) {
+  if (!solutionPack) return null;
+
+  const materialTitles = solutionPack.todayTask.requiredMaterialIds
+    .map(id => solutionPack.materials.find(material => material.id === id)?.title)
+    .filter(Boolean);
+
+  return (
+    <section className="bg-white border border-[#CFE0FF] rounded-3xl p-5 sm:p-6 shadow-[0_18px_54px_rgba(0,80,180,0.10)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#007AFF]/10 flex items-center justify-center shrink-0">
+            <Target className="w-5 h-5 text-[#007AFF]" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-[#007AFF] mb-1">Solution Pack</div>
+            <h2 className="text-lg font-semibold text-[#1D1D1F]">你的解决方案包</h2>
+            <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">
+              基于你的问题生成的路径、材料、任务和反馈机制
+            </p>
+          </div>
+        </div>
+        <div className="inline-flex w-fit rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-medium text-[#007AFF]">
+          {problemShapeLabels[solutionPack.problemShape]}
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-gradient-to-br from-[#F3F7FF] to-white border border-[#E1ECFF] p-4 mb-4">
+        <div className="text-xs font-semibold text-[#007AFF] mb-2">真正阻碍</div>
+        <p className="text-sm font-semibold leading-relaxed text-[#1D1D1F]">{solutionPack.coreObstacle.summary}</p>
+        <p className="mt-2 text-xs leading-relaxed text-[#6B7280]">{solutionPack.problemSummary.interpretedProblem}</p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <div className="text-xs font-semibold text-[#9CA3AF] mb-2">解决路径</div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {solutionPack.solutionPath.slice(0, 3).map(step => (
+              <div key={`${step.order}-${step.step}`} className="rounded-2xl bg-[#F8FAFD] p-3">
+                <div className="mb-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-[#007AFF]">
+                  {step.order}
+                </div>
+                <div className="text-sm font-semibold text-[#1D1D1F]">{step.step}</div>
+                <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">{step.purpose}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-xs font-semibold text-[#9CA3AF] mb-2">所需能力</div>
+          <div className="flex flex-wrap gap-2">
+            {solutionPack.requiredCapabilities.slice(0, 4).map(item => (
+              <span key={item.capability} className="rounded-full bg-[#F3F7FF] px-2.5 py-1 text-xs text-[#3B6EA8]">
+                {item.capability}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-xs font-semibold text-[#9CA3AF] mb-2">执行材料</div>
+          <div className="space-y-2">
+            {solutionPack.materials.slice(0, 3).map(material => (
+              <div key={material.id} className="rounded-2xl border border-[#E5E7EB] bg-[#FAFBFC] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-[#1D1D1F]">{material.title}</div>
+                  <div className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] text-[#6B7280]">
+                    {material.type}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">{material.purpose}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#8A94A6]">{material.usageInstruction}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-[#1D1D1F] p-4 text-white">
+          <div className="text-xs font-medium text-white/60 mb-1">今日任务</div>
+          <p className="text-sm font-semibold leading-relaxed text-white">{solutionPack.todayTask.title}</p>
+          {materialTitles.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-white/65">
+              先使用：{materialTitles.join('、')}
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -1071,6 +1193,8 @@ export default function RadarPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [verificationPhase, setVerificationPhase] = useState<VerificationPhase>('idle');
   const [evidenceHistory, setEvidenceHistory] = useState<EvidenceRecord[]>([]);
+  const [isSavingDiscovery, setIsSavingDiscovery] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadProfileForRadar = async (): Promise<FutureProfile | null> => {
@@ -1284,8 +1408,10 @@ export default function RadarPage() {
       userDiscovery: result.userDiscovery,
     };
 
+    setIsSavingDiscovery(true);
+    setDiscoveryError(null);
+
     try {
-      let record: EvidenceRecord;
       const response = await fetch('/api/discoveries', {
         method: 'POST',
         headers: {
@@ -1294,29 +1420,11 @@ export default function RadarPage() {
         body: JSON.stringify(payload),
       });
 
-      if (response.ok) {
-        const saved = await response.json();
-        record = saved.item as EvidenceRecord;
-      } else if (response.status === 401) {
-        const now = new Date().toISOString();
-        record = {
-          id: `${Date.now()}`,
-          userId: 'local-cache',
-          radarCreatedAt: payload.radarCreatedAt || null,
-          sourceJudgment: payload.sourceJudgment,
-          verificationGoal: payload.verificationGoal,
-          actionTitle: payload.actionTitle,
-          category: payload.category,
-          outcomeCode: payload.outcomeCode,
-          outcomeLabel: payload.outcomeLabel,
-          userResult: payload.userResult,
-          userDiscovery: payload.userDiscovery,
-          createdAt: now,
-          updatedAt: now,
-        };
-      } else {
-        throw new Error('Failed to save discovery');
+      const saved = await response.json().catch(() => null);
+      if (!response.ok || !saved?.success || !saved?.item) {
+        throw new Error(saved?.error || '无法保存这次发现，请稍后重试');
       }
+      const record = saved.item as EvidenceRecord;
 
       const stored = localStorage.getItem(EVIDENCE_HISTORY_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
@@ -1324,11 +1432,13 @@ export default function RadarPage() {
       const nextHistory = [record, ...history];
       localStorage.setItem(EVIDENCE_HISTORY_KEY, JSON.stringify(nextHistory));
       setEvidenceHistory(nextHistory);
+      setVerificationPhase('recorded');
     } catch (err) {
       console.error('[Radar] Failed to save discovery:', err);
+      setDiscoveryError(err instanceof Error ? err.message : '无法保存这次发现，请稍后重试');
+    } finally {
+      setIsSavingDiscovery(false);
     }
-
-    setVerificationPhase('recorded');
   };
 
   const handleVerificationSubmit = (
@@ -1506,6 +1616,8 @@ export default function RadarPage() {
             latestEvidence={latestEvidence}
           />
 
+          <SolutionPackPreviewCard solutionPack={radarData.solutionPack} />
+
           {latestEvidence && (
             <UpdatedJudgmentCard record={latestEvidence} />
           )}
@@ -1534,7 +1646,12 @@ export default function RadarPage() {
             <RecordDiscoveryCard
               action={currentVerificationAction}
               context={verificationContext}
-              onCancel={() => setVerificationPhase('started')}
+              error={discoveryError}
+              isSubmitting={isSavingDiscovery}
+              onCancel={() => {
+                setDiscoveryError(null);
+                setVerificationPhase('started');
+              }}
               onSubmit={handleVerificationSubmitV2}
             />
           )}

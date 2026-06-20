@@ -227,6 +227,111 @@ export type ActionItem = {
   action?: string;  // V6.6 新增：今晚任务需要完成的具体动作
 };
 
+// ============================================================
+// Phase 1 Solution Pack 类型
+// ============================================================
+
+export type ProblemShape =
+  | 'learn_capability'
+  | 'build_workflow'
+  | 'create_output'
+  | 'make_decision'
+  | 'validate_opportunity'
+  | 'solve_specific_task';
+
+export type CapabilityName =
+  | 'search_information'
+  | 'generate_learning_plan'
+  | 'generate_exercises'
+  | 'generate_explanation'
+  | 'generate_document'
+  | 'generate_table'
+  | 'generate_workflow'
+  | 'generate_prompt_template'
+  | 'generate_checklist'
+  | 'generate_review_form'
+  | 'generate_message_template'
+  | 'generate_script'
+  | 'compare_options'
+  | 'run_validation_design'
+  | 'track_task'
+  | 'update_plan_from_feedback';
+
+export type SolutionMaterialType =
+  | 'learning_plan'
+  | 'exercise_set'
+  | 'explanation'
+  | 'document_template'
+  | 'table'
+  | 'workflow'
+  | 'prompt_template'
+  | 'checklist'
+  | 'review_form'
+  | 'script'
+  | 'message_template';
+
+export type SolutionPack = {
+  problemSummary: {
+    userOriginalProblem: string;
+    interpretedProblem: string;
+    missingInformation: string[];
+  };
+  problemShape: ProblemShape;
+  coreObstacle: {
+    summary: string;
+    whyItBlocksProgress: string;
+    evidenceFromContext: string[];
+  };
+  targetOutcome: {
+    desiredResult: string;
+    successDefinition: string;
+    timeConstraint?: string;
+  };
+  solutionPath: Array<{
+    step: string;
+    purpose: string;
+    order: number;
+    expectedOutput: string;
+  }>;
+  requiredCapabilities: Array<{
+    capability: CapabilityName;
+    reason: string;
+    priority: 'high' | 'medium' | 'low';
+  }>;
+  materials: Array<{
+    id: string;
+    type: SolutionMaterialType;
+    title: string;
+    purpose: string;
+    content: string;
+    usageInstruction: string;
+  }>;
+  todayTask: {
+    title: string;
+    task: string;
+    estimatedTime: string;
+    requiredMaterialIds: string[];
+    executionSteps: string[];
+  };
+  completionCriteria: {
+    minimumDone: string;
+    goodEnoughResult: string;
+    evidenceToRecord: string;
+  };
+  feedbackQuestions: Array<{
+    key: string;
+    question: string;
+    answerType: 'text' | 'choice' | 'number' | 'boolean';
+    options?: string[];
+  }>;
+  nextAdjustmentLogic: Array<{
+    condition: string;
+    interpretation: string;
+    nextMove: string;
+    capabilityToUseNext?: CapabilityName;
+  }>;
+};
+
 // V5.5 Personal Impact 类型
 export type PersonalImpact = {
   affectedPart: string;
@@ -248,6 +353,7 @@ export type OpportunityRadarV4 = {
   todayChanges: TodayChange[];
   personalImpact?: PersonalImpact;
   coreInsight?: CoreInsight;  // V6.1 新增
+  solutionPack?: SolutionPack;  // Phase 1 新增：并行保留旧 Radar 字段
   valueMigration?: ValueMigration;  // V6.0 新增
   impactOnUser: ImpactOnUser;
   decisionExplanation?: DecisionExplanation;  // V5.8 新增
