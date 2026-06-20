@@ -175,6 +175,49 @@ function isSpeechOrPresentation(goal: string): boolean {
   return /(汇报|ppt|报告|演讲|答辩|开会|presentation)/i.test(goal);
 }
 
+function isExamApplicationCoordination(text: string): boolean {
+  const hasExam = /(雅思|ielts|托福|toefl|gre|gmat|备考|考试|分数|口语|听力|阅读|写作)/i.test(text);
+  const hasApplication = /(申请|申请材料|文书|推荐信|项目经历|作品集|留学|院校|截止|deadline)/i.test(text);
+  return hasExam && hasApplication;
+}
+
+function createExamApplicationMaterialContent(plan: CapabilityPlan, goal: string, obstacle: string): string {
+  if (plan.materialType === 'learning_plan') {
+    return `雅思备考 + 申请材料并行计划
+核心判断：${obstacle}
+本周不要把“先考完雅思”和“之后再准备申请”完全切开，先同步推进两个最小版本。
+
+本周安排：
+1. 雅思：每天完成1个最小训练块，只追踪最薄弱单项。
+2. 申请材料：列出所有截止时间、必交材料和当前缺口。
+3. 项目经历：每天整理1段能写进文书或简历的真实经历。
+4. 过来人访谈：问1位已经申请过的人，确认材料准备顺序。
+
+完成标志：到本周末，你应该同时知道“雅思下一步练什么”和“申请材料最先补什么”。`;
+  }
+
+  if (plan.materialType === 'exercise_set') {
+    return `今日同步推进清单
+目标：${goal}
+
+今天只做4件小事：
+1. 雅思：做一次25分钟单项诊断，记录最弱题型。
+2. 申请：列出目标项目需要的材料清单。
+3. 经历：写下1个项目经历，包含背景、你的动作、结果。
+4. 访谈：准备3个问题问学长/中介/过来人：
+   - 申请材料最容易低估哪一项？
+   - 雅思分数和材料准备应该怎么并行？
+   - 现在最先补什么，最晚可以等什么？`;
+  }
+
+  return `| 模块 | 今天要做什么 | 产出 | 当前缺口 | 下一步 |
+| --- | --- | --- | --- | --- |
+| 雅思备考 | 25分钟单项诊断 | 最弱题型记录 |  |  |
+| 申请材料 | 列必交材料 | 材料清单 |  |  |
+| 项目经历 | 整理1段经历 | 背景/动作/结果 |  |  |
+| 过来人访谈 | 发出1次询问 | 对方原话 |  |  |`;
+}
+
 function createMaterialContent(
   shape: ProblemShape,
   plan: CapabilityPlan,
@@ -186,6 +229,11 @@ function createMaterialContent(
   const goal = getGoal(profile, action, target);
   const situation = profile.currentSituation || goal;
   const anxiety = profile.currentAnxiety || obstacle || '不知道下一步怎么推进';
+  const contextText = compactText([goal, situation, anxiety, obstacle, action.task, action.reason]);
+
+  if (shape === 'learn_capability' && isExamApplicationCoordination(contextText)) {
+    return createExamApplicationMaterialContent(plan, goal, obstacle);
+  }
 
   if (shape === 'learn_capability') {
     if (plan.materialType === 'learning_plan') {
@@ -399,11 +447,27 @@ function buildMaterials(
   target: string,
   obstacle: string
 ): SolutionPack['materials'] {
+  const contextText = compactText([
+    profile.currentSituation,
+    profile.currentGoal,
+    profile.currentAnxiety,
+    target,
+    obstacle,
+    action.task,
+    action.reason,
+  ]);
+  const isCoordinatedExamApplication = shape === 'learn_capability' && isExamApplicationCoordination(contextText);
+  const coordinatedTitles = [
+    { title: '雅思备考 + 申请材料并行计划', purpose: '把备考和申请材料同步拆到本周，而不是前后割裂。' },
+    { title: '今日同步推进清单', purpose: '同时推进一个雅思诊断、一个申请材料缺口和一个经历整理动作。' },
+    { title: '本周执行表', purpose: '记录雅思、申请材料、项目经历和过来人访谈的真实进展。' },
+  ];
+
   return plans.slice(0, 3).map((plan, index) => ({
     id: `material-${index + 1}`,
     type: plan.materialType,
-    title: plan.title,
-    purpose: plan.purpose,
+    title: isCoordinatedExamApplication ? coordinatedTitles[index].title : plan.title,
+    purpose: isCoordinatedExamApplication ? coordinatedTitles[index].purpose : plan.purpose,
     content: createMaterialContent(shape, plan, profile, action, target, obstacle),
     usageInstruction: getUsageInstruction(shape, index),
   }));

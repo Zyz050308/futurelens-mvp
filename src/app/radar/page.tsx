@@ -7,7 +7,7 @@ import { loadProfile } from '@/lib/radar';
 import { getChangeSignalsForProfile, generateProfileHash } from '@/lib/changeEngine';
 import { analyzeUserState } from '@/lib/stateEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
-import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, ProblemShape } from '@/types/radar';
+import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
 
 type VerificationPhase = 'idle' | 'started' | 'recording' | 'recorded';
@@ -687,6 +687,75 @@ const problemShapeLabels: Record<ProblemShape, string> = {
   solve_specific_task: '解决一个具体任务',
 };
 
+const capabilityLabels: Record<CapabilityName, string> = {
+  search_information: '信息搜索',
+  generate_learning_plan: '学习计划生成',
+  generate_exercises: '练习材料生成',
+  generate_explanation: '解释说明生成',
+  generate_document: '文档结构生成',
+  generate_table: '表格/记录表生成',
+  generate_workflow: '工作流拆解',
+  generate_prompt_template: '提示词模板生成',
+  generate_checklist: '执行清单生成',
+  generate_review_form: '反馈表生成',
+  generate_message_template: '沟通话术生成',
+  generate_script: '脚本生成',
+  compare_options: '选项比较',
+  run_validation_design: '机会验证设计',
+  track_task: '任务追踪',
+  update_plan_from_feedback: '反馈后调整',
+};
+
+const materialTypeLabels: Record<SolutionMaterialType, string> = {
+  learning_plan: '学习计划',
+  exercise_set: '练习材料',
+  explanation: '解释说明',
+  document_template: '文档模板',
+  table: '记录表',
+  workflow: '工作流',
+  prompt_template: '提示词模板',
+  checklist: '执行清单',
+  review_form: '反馈表',
+  script: '脚本',
+  message_template: '沟通话术',
+};
+
+function SolutionMaterialCard({ material }: { material: SolutionPack['materials'][number] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="rounded-2xl border border-[#DCE8FA] bg-white p-4 shadow-[0_8px_24px_rgba(0,80,180,0.04)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-[#1D1D1F]">{material.title}</div>
+          <div className="mt-1 inline-flex rounded-full bg-[#EEF5FF] px-2.5 py-1 text-[11px] font-medium text-[#3B6EA8]">
+            {materialTypeLabels[material.type]}
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-[#6B7280]">{material.purpose}</p>
+      <div className="mt-3 rounded-2xl bg-[#F8FAFD] p-3">
+        <div className="mb-1 text-[11px] font-semibold text-[#9CA3AF]">今天怎么用</div>
+        <p className="text-xs leading-relaxed text-[#4B5563]">{material.usageInstruction}</p>
+      </div>
+      <div className="mt-3 rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-3">
+        <div className="mb-2 text-[11px] font-semibold text-[#9CA3AF]">材料正文</div>
+        <pre className={`whitespace-pre-wrap break-words text-xs leading-6 text-[#1D1D1F] ${isExpanded ? '' : 'max-h-[7.5rem] overflow-hidden'}`}>
+          {material.content}
+        </pre>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(value => !value)}
+          className="mt-3 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-[#007AFF] ring-1 ring-[#D6E6FF] hover:bg-[#F3F7FF]"
+        >
+          {isExpanded ? '收起材料' : '展开材料'}
+          {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps) {
   if (!solutionPack) return null;
 
@@ -695,15 +764,18 @@ function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps)
     .filter(Boolean);
 
   return (
-    <section className="bg-white border border-[#CFE0FF] rounded-3xl p-5 sm:p-6 shadow-[0_18px_54px_rgba(0,80,180,0.10)]">
+    <section className="relative overflow-hidden bg-white border border-[#BFD7FF] rounded-3xl p-5 sm:p-7 shadow-[0_24px_70px_rgba(0,80,180,0.14)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#007AFF] via-[#54A3FF] to-[#BBD8FF]" />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#007AFF]/10 flex items-center justify-center shrink-0">
-            <Target className="w-5 h-5 text-[#007AFF]" />
+          <div className="w-11 h-11 rounded-2xl bg-[#007AFF] flex items-center justify-center shrink-0 shadow-[0_12px_24px_rgba(0,122,255,0.22)]">
+            <Target className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-[#007AFF] mb-1">Solution Pack</div>
-            <h2 className="text-lg font-semibold text-[#1D1D1F]">你的解决方案包</h2>
+            <div className="mb-1 inline-flex rounded-full bg-[#EEF5FF] px-2.5 py-1 text-[11px] font-semibold text-[#007AFF]">
+              当前核心产物
+            </div>
+            <h2 className="text-xl font-semibold text-[#1D1D1F]">你的解决方案包</h2>
             <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">
               基于你的问题生成的路径、材料、任务和反馈机制
             </p>
@@ -741,7 +813,7 @@ function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps)
           <div className="flex flex-wrap gap-2">
             {solutionPack.requiredCapabilities.slice(0, 4).map(item => (
               <span key={item.capability} className="rounded-full bg-[#F3F7FF] px-2.5 py-1 text-xs text-[#3B6EA8]">
-                {item.capability}
+                {capabilityLabels[item.capability]}
               </span>
             ))}
           </div>
@@ -749,18 +821,9 @@ function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps)
 
         <div>
           <div className="text-xs font-semibold text-[#9CA3AF] mb-2">执行材料</div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {solutionPack.materials.slice(0, 3).map(material => (
-              <div key={material.id} className="rounded-2xl border border-[#E5E7EB] bg-[#FAFBFC] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-[#1D1D1F]">{material.title}</div>
-                  <div className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] text-[#6B7280]">
-                    {material.type}
-                  </div>
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">{material.purpose}</p>
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#8A94A6]">{material.usageInstruction}</p>
-              </div>
+              <SolutionMaterialCard key={material.id} material={material} />
             ))}
           </div>
         </div>
