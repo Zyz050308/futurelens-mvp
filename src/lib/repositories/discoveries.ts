@@ -18,6 +18,19 @@ type DiscoveryRow = {
   updated_at: Date;
 };
 
+export function toMysqlDateTime(value: string | Date | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid radar created time');
+  }
+
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function mapDiscovery(row: DiscoveryRow): DiscoveryRecord {
   return {
     id: row.id,
@@ -58,7 +71,7 @@ export async function createDiscovery(
     [
       id,
       userId,
-      input.radarCreatedAt || null,
+      toMysqlDateTime(input.radarCreatedAt),
       input.sourceJudgment,
       input.verificationGoal,
       input.actionTitle,
