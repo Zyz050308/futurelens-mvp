@@ -81,12 +81,19 @@ export function buildCapabilityRoute(problemUnderstanding: ProblemUnderstanding)
 
   return capabilities.map((capabilityId, index) => {
     const capability = getCapabilityById(capabilityId);
-    const executor = getExecutorById(capability.defaultExecutorId);
+    const useManualTextFallback =
+      capabilityId === 'analyze_file'
+      && problemUnderstanding.problemShape === 'analyze_existing_material'
+      && problemUnderstanding.hasManualMaterialText;
+    const executor = getExecutorById(
+      useManualTextFallback ? 'manual_text_input_fallback' : capability.defaultExecutorId
+    );
     const futureExecutors = capability.availableExecutorIds
-      .filter(id => id !== capability.defaultExecutorId)
+      .filter(id => id !== executor.id)
       .map(id => getExecutorById(id))
       .filter(item => item.currentStatus === 'planned');
-    const unavailable = capability.currentStatus === 'unavailable' || executor.currentStatus === 'unavailable';
+    const capabilityStatus = useManualTextFallback ? 'simulated' : capability.currentStatus;
+    const unavailable = capabilityStatus === 'unavailable' || executor.currentStatus === 'unavailable';
 
     return {
       routeId: `capability-route-${index + 1}`,
@@ -98,13 +105,13 @@ export function buildCapabilityRoute(problemUnderstanding: ProblemUnderstanding)
       executorId: executor.id,
       executorName: executor.name,
       executionMethod: executor.userVisibleMethod,
-      capabilityStatus: capability.currentStatus,
+      capabilityStatus,
       executorStatus: executor.currentStatus,
-      isSimulated: executor.isSimulated || capability.currentStatus === 'simulated',
+      isSimulated: executor.isSimulated || capabilityStatus === 'simulated',
       requiresUserInput: capability.requiresUserInput,
       requiresAuthorization: capability.requiresAuthorization,
-      requiresFileUpload: capability.requiresFileUpload,
-      canRunAutomatically: capability.canRunAutomatically && !unavailable,
+      requiresFileUpload: useManualTextFallback ? false : capability.requiresFileUpload,
+      canRunAutomatically: (useManualTextFallback || capability.canRunAutomatically) && !unavailable,
       fallbackExecutorId: unavailable ? 'manual_context_only' : undefined,
       fallbackInstruction: unavailable
         ? '当前版本还不能直接读取文件，请先把材料中的关键文本粘贴到问题描述或反馈里。'

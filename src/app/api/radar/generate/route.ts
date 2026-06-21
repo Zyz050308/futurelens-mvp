@@ -18,12 +18,37 @@ export interface GenerateRadarRequest {
   profile: FutureProfile;
   changeSignals: ChangeSignal[];
   userStateProfile?: any;
+  attachedContext?: {
+    type: 'pasted_text';
+    label?: string;
+    content: string;
+  };
 }
 
-function buildPrompt(profile: FutureProfile, changeSignals: ChangeSignal[], userStateProfile?: any): string {
+function normalizeAttachedContext(attachedContext?: GenerateRadarRequest['attachedContext']) {
+  const content = attachedContext?.content?.trim();
+  if (!content || attachedContext?.type !== 'pasted_text') return undefined;
+
+  return {
+    type: 'pasted_text' as const,
+    label: attachedContext.label?.trim() || '粘贴材料',
+    content: content.slice(0, 5000),
+  };
+}
+
+function buildPrompt(
+  profile: FutureProfile,
+  changeSignals: ChangeSignal[],
+  userStateProfile?: any,
+  attachedContext?: GenerateRadarRequest['attachedContext']
+): string {
   const profileText = JSON.stringify(profile, null, 2);
   const signalsText = JSON.stringify(changeSignals, null, 2);
   const stateText = userStateProfile ? JSON.stringify(userStateProfile, null, 2) : '';
+  const normalizedAttachedContext = normalizeAttachedContext(attachedContext);
+  const attachedContextText = normalizedAttachedContext
+    ? `\n【用户粘贴的待分析材料】\n类型：${normalizedAttachedContext.label}\n内容：\n${normalizedAttachedContext.content}\n\n如果用户问题属于已有材料分析，请基于这段材料判断问题，不要泛泛而谈。当前版本只支持粘贴文本分析，不要声称已经上传或解析文件。\n`
+    : '';
 
   // 构建 UserStateProfile
   const backgroundDomain = detectBackgroundDomain(profile);
@@ -319,6 +344,8 @@ ${userStateProfile?.state === 'direction_confusion' ? `
 
 用户档案：
 ${profileText}
+
+${attachedContextText}
 
 今日变化信号（这些是与该用户最相关的信号，必须基于这些信号进行分析）：
 ${signalsText}
@@ -982,7 +1009,7 @@ export async function POST(request: NextRequest) {
 
     // 构建 Prompt
     console.log('[DEBUG] 开始构建 Prompt');
-    const prompt = buildPrompt(profile, changeSignals, body.userStateProfile);
+    const prompt = buildPrompt(profile, changeSignals, body.userStateProfile, body.attachedContext);
     console.log('[DEBUG] Prompt 长度:', prompt.length, '字符');
 
     // 检测 insightDomain 和 selectedInsight
@@ -1039,7 +1066,8 @@ export async function POST(request: NextRequest) {
     const radarData = ensureSolutionPack(
       alignedRadarData,
       profile,
-      body.userStateProfile
+      body.userStateProfile,
+      { attachedContext: normalizeAttachedContext(body.attachedContext) }
     );
 
     // 检查是否是 fallback（解析失败）
@@ -1060,7 +1088,8 @@ export async function POST(request: NextRequest) {
       ? ensureSolutionPack(
           createFallbackRadar(),
           requestBody.profile,
-          requestBody.userStateProfile
+          requestBody.userStateProfile,
+          { attachedContext: normalizeAttachedContext(requestBody.attachedContext) }
         )
       : createFallbackRadar();
 

@@ -676,6 +676,8 @@ function RecentDiscoveriesCard({ records }: RecentDiscoveriesCardProps) {
 
 interface SolutionPackPreviewCardProps {
   solutionPack?: SolutionPack;
+  onAnalyzeMaterial?: (materialText: string) => Promise<void>;
+  isAnalyzingMaterial?: boolean;
 }
 
 const problemShapeLabels: Record<ProblemShape, string> = {
@@ -829,7 +831,85 @@ function CapabilityRouteMiniPanel({ solutionPack }: { solutionPack: SolutionPack
   );
 }
 
-function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps) {
+function ManualMaterialInputPanel({
+  solutionPack,
+  onAnalyzeMaterial,
+  isAnalyzingMaterial = false,
+}: {
+  solutionPack: SolutionPack;
+  onAnalyzeMaterial?: (materialText: string) => Promise<void>;
+  isAnalyzingMaterial?: boolean;
+}) {
+  const [materialText, setMaterialText] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const hasManualMaterialText = Boolean(solutionPack.problemUnderstanding?.hasManualMaterialText);
+
+  if (solutionPack.problemShape !== 'analyze_existing_material') return null;
+
+  if (hasManualMaterialText) {
+    return (
+      <div className="rounded-2xl border border-[#D8E8D9] bg-[#F4FBF5] p-4">
+        <div className="text-sm font-semibold text-[#248A3D]">已基于粘贴文本生成材料分析</div>
+        <p className="mt-1 text-xs leading-relaxed text-[#4B5563]">
+          当前版本使用粘贴文本分析，文件上传和 PDF / Word 解析会在后续版本接入。
+        </p>
+      </div>
+    );
+  }
+
+  const trimmedText = materialText.trim();
+  const canSubmit = trimmedText.length >= 20 && Boolean(onAnalyzeMaterial);
+
+  const handleSubmit = async () => {
+    if (!onAnalyzeMaterial || !canSubmit || isAnalyzingMaterial) return;
+    setLocalError(null);
+    try {
+      await onAnalyzeMaterial(trimmedText.slice(0, 5000));
+      setMaterialText('');
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : '材料分析失败，请稍后重试。');
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-[#DCE8FA] bg-[#F8FAFD] p-4">
+      <div className="text-sm font-semibold text-[#1D1D1F]">粘贴你要分析的材料</div>
+      <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">
+        当前版本先支持粘贴文本分析，文件上传会在后续版本接入。
+      </p>
+      <textarea
+        value={materialText}
+        onChange={(event) => {
+          setMaterialText(event.target.value.slice(0, 5000));
+          setLocalError(null);
+        }}
+        rows={6}
+        placeholder="把简历、作品集介绍、汇报稿、申请材料等文字粘贴到这里。"
+        className="mt-3 w-full rounded-2xl border border-[#D6E6FF] bg-white px-4 py-3 text-sm leading-relaxed text-[#1D1D1F] placeholder:text-[#9CA3AF] focus:border-[#007AFF] focus:outline-none"
+      />
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-[11px] text-[#9CA3AF]">{trimmedText.length}/5000 字</span>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit || isAnalyzingMaterial}
+          className="inline-flex h-10 items-center justify-center rounded-full bg-[#1D1D1F] px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {isAnalyzingMaterial ? '正在分析...' : '分析这份材料'}
+        </button>
+      </div>
+      {localError && (
+        <p className="mt-2 text-xs leading-relaxed text-[#C9342D]">{localError}</p>
+      )}
+    </div>
+  );
+}
+
+function SolutionPackPreviewCard({
+  solutionPack,
+  onAnalyzeMaterial,
+  isAnalyzingMaterial,
+}: SolutionPackPreviewCardProps) {
   if (!solutionPack) return null;
 
   const materialTitles = solutionPack.todayTask.requiredMaterialIds
@@ -893,6 +973,12 @@ function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps)
         </div>
 
         <CapabilityRouteMiniPanel solutionPack={solutionPack} />
+
+        <ManualMaterialInputPanel
+          solutionPack={solutionPack}
+          onAnalyzeMaterial={onAnalyzeMaterial}
+          isAnalyzingMaterial={isAnalyzingMaterial}
+        />
 
         <div>
           <div className="text-xs font-semibold text-[#9CA3AF] mb-2">执行材料</div>
@@ -1329,6 +1415,7 @@ export default function RadarPage() {
   const [radarCreatedAt, setRadarCreatedAt] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isAnalyzingMaterial, setIsAnalyzingMaterial] = useState(false);
   const [verificationPhase, setVerificationPhase] = useState<VerificationPhase>('idle');
   const [evidenceHistory, setEvidenceHistory] = useState<EvidenceRecord[]>([]);
   const [isSavingDiscovery, setIsSavingDiscovery] = useState(false);
@@ -1635,6 +1722,48 @@ export default function RadarPage() {
     loadRadar(true);
   };
 
+  const handleAnalyzeMaterial = async (materialText: string) => {
+    if (!profile) {
+      throw new Error('请先完成 Profile，再分析材料。');
+    }
+
+    try {
+      setIsAnalyzingMaterial(true);
+      setError(null);
+
+      const currentState = userState || analyzeUserState(profile);
+      const currentProfileHash = generateProfileHash(profile);
+      const changeSignals = getChangeSignalsForProfile(profile, currentState);
+
+      const response = await fetch('/api/radar/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile,
+          changeSignals,
+          userStateProfile: currentState,
+          attachedContext: {
+            type: 'pasted_text',
+            label: '粘贴材料',
+            content: materialText.slice(0, 5000),
+          },
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '材料分析失败，请稍后重试。');
+      }
+
+      setRadarData(result.data);
+      saveToCache(result.data, currentProfileHash, currentState);
+    } finally {
+      setIsAnalyzingMaterial(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center">
@@ -1754,7 +1883,11 @@ export default function RadarPage() {
             latestEvidence={latestEvidence}
           />
 
-          <SolutionPackPreviewCard solutionPack={radarData.solutionPack} />
+          <SolutionPackPreviewCard
+            solutionPack={radarData.solutionPack}
+            onAnalyzeMaterial={handleAnalyzeMaterial}
+            isAnalyzingMaterial={isAnalyzingMaterial}
+          />
 
           {latestEvidence && (
             <UpdatedJudgmentCard record={latestEvidence} />

@@ -8,7 +8,7 @@ import type {
   SolutionPack,
   UserStateProfile,
 } from '@/types/radar';
-import type { ProblemUnderstanding } from '@/types/capability';
+import type { AttachedContextSummary, ProblemUnderstanding } from '@/types/capability';
 import { buildCapabilityRoute } from './capabilityRouter';
 import { buildExecutionPlan } from './executionPlanner';
 
@@ -21,6 +21,23 @@ type CapabilityPlan = {
 };
 
 type FeedbackQuestion = SolutionPack['feedbackQuestions'][number];
+
+type AttachedContextInput = {
+  type: 'pasted_text';
+  label?: string;
+  content: string;
+};
+
+type SolutionPackOptions = {
+  attachedContext?: AttachedContextInput;
+};
+
+type MaterialIssue = {
+  problem: string;
+  why: string;
+  direction: string;
+  example: string;
+};
 
 function compactText(values: Array<string | undefined>): string {
   return values.filter(Boolean).join(' ').toLowerCase();
@@ -63,10 +80,12 @@ function hasUrgentConcreteTask(text: string): boolean {
 }
 
 function needsExistingMaterialAnalysis(text: string): boolean {
-  const hasExistingMaterial = /(已有|现有|一份|这份|我的)?(简历|作品集|作品|文档|文件|材料|报告|ppt|pdf|word|表格|方案|介绍页)/i.test(text);
-  const asksForReview = /(修改|优化|分析|哪里|问题|不足|建议|改进|检查|润色|诊断|反馈|评估)/i.test(text);
+  const hasMaterialType = /(简历|cv|作品集|portfolio|ps|个人陈述|申请材料|汇报稿|报告|文档|文章|脚本|介绍页|项目介绍|材料)/i.test(text);
+  const hasExistingSignal = /(已有|现有|一份|这份|我的|我有|我写了|写了一段|帮我看|帮我看看|帮我改|这是我的)/i.test(text);
+  const asksForReview = /(哪里需要修改|哪里不专业|怎么优化|修改|优化|分析|不足|建议|改进|检查|润色|诊断|反馈|评估|是否清楚)/i.test(text);
+  const fromScratchSignal = /(想写|要写|从零|不知道怎么写|帮我写|生成一份|做一份|创建)/i.test(text);
 
-  return hasExistingMaterial && asksForReview;
+  return hasMaterialType && asksForReview && hasExistingSignal && !fromScratchSignal;
 }
 
 function needsResearchInformation(text: string): boolean {
@@ -74,6 +93,13 @@ function needsResearchInformation(text: string): boolean {
   const isOnlyInformationGap = /(不知道|不清楚|不了解|缺少|没有资料|没有信息|从哪找|哪里找)/i.test(text);
 
   return asksForInformation && isOnlyInformationGap;
+}
+
+function isCreateOutputRequest(text: string): boolean {
+  const hasOutput = /(文章|简历|作品集|作品集项目介绍|介绍页|项目介绍|方案书|方案|视频|脚本|文案|报告|汇报|页面|海报|内容|小红书|ppt)/i.test(text);
+  const wantsCreation = /(想写|要写|怎么写|不知道怎么写|做一份|创建|生成|写一份|搭结构|结构怎么)/i.test(text);
+
+  return hasOutput && wantsCreation && !needsExistingMaterialAnalysis(text);
 }
 
 export function inferProblemShape(
@@ -109,6 +135,10 @@ export function inferProblemShape(
     return 'create_output';
   }
 
+  if (isCreateOutputRequest(primaryText)) {
+    return 'create_output';
+  }
+
   if (
     userStateProfile?.problemType === 'career_direction'
     || userStateProfile?.problemType === 'career_security'
@@ -122,7 +152,7 @@ export function inferProblemShape(
     return 'build_workflow';
   }
 
-  if (needsResearchInformation(text)) {
+  if (needsResearchInformation(primaryText)) {
     return 'research_information';
   }
 
@@ -259,6 +289,185 @@ function createExamApplicationMaterialContent(plan: CapabilityPlan, goal: string
 | 申请材料 | 列必交材料 | 材料清单 |  |  |
 | 项目经历 | 整理1段经历 | 背景/动作/结果 |  |  |
 | 过来人访谈 | 发出1次询问 | 对方原话 |  |  |`;
+}
+
+function normalizeAttachedContext(attachedContext?: AttachedContextInput): AttachedContextInput | undefined {
+  const content = attachedContext?.content?.trim();
+  if (!content || attachedContext?.type !== 'pasted_text') return undefined;
+
+  return {
+    type: 'pasted_text',
+    label: attachedContext.label?.trim() || '粘贴材料',
+    content: content.slice(0, 5000),
+  };
+}
+
+function summarizeAttachedContext(attachedContext?: AttachedContextInput): AttachedContextSummary | undefined {
+  const normalized = normalizeAttachedContext(attachedContext);
+  if (!normalized) return undefined;
+
+  return {
+    type: 'pasted_text',
+    label: normalized.label,
+    contentPreview: normalized.content.slice(0, 180),
+    charCount: normalized.content.length,
+  };
+}
+
+function analyzeManualMaterial(content: string, goal: string): MaterialIssue[] {
+  const text = content.trim();
+  const issues: MaterialIssue[] = [];
+  const addIssue = (issue: MaterialIssue) => {
+    if (!issues.some(item => item.problem === issue.problem)) {
+      issues.push(issue);
+    }
+  };
+
+  if (/(熟练掌握|性格开朗|较强沟通能力|多个项目|相关工作|整体还可以|品牌感觉|希望能)/i.test(text)) {
+    addIssue({
+      problem: '表达偏泛，缺少可以判断能力的具体证据',
+      why: '这类表达很常见，但看不出你具体做了什么、做到了什么程度，也不容易让对方形成明确判断。',
+      direction: '把抽象评价换成具体场景、动作和结果。',
+      example: '把“有较强沟通能力”改成“在项目中负责和需求方确认视觉风格，整理 3 轮反馈并完成最终版交付”。',
+    });
+  }
+
+  if (!/(目标|需求|问题|背景|对象|用户|岗位|申请|受众)/i.test(text)) {
+    addIssue({
+      problem: '缺少目标对象或真实问题',
+      why: '材料没有说明它服务谁、解决什么问题，对方只能看到经历或产物，看不到判断能力。',
+      direction: '开头先补一句“这份材料/这个项目要解决什么问题”。',
+      example: `面向${goal || '目标对象'}，我需要先说明项目背景、目标对象和核心问题，再展示做法。`,
+    });
+  }
+
+  if (!/(因为|所以|策略|方法|判断|选择|取舍|调研|分析)/i.test(text)) {
+    addIssue({
+      problem: '缺少方法和判断过程',
+      why: '只说做了什么，不说为什么这样做，会让材料像任务记录，而不是能力证明。',
+      direction: '补充你如何判断、如何取舍、为什么选择这个方案。',
+      example: '增加一句“我先比较了 A/B 两种表达方向，最终选择更适合年轻用户识别的方案”。',
+    });
+  }
+
+  if (!/(结果|提升|降低|完成|上线|反馈|数据|获得|转化|录用|通过)/i.test(text)) {
+    addIssue({
+      problem: '缺少结果说明',
+      why: '没有结果，对方无法判断这段经历或材料是否真的有效。',
+      direction: '补充一个可观察结果：数据、反馈、交付物、通过情况或下一步影响。',
+      example: '补充“最终形成 3 个视觉方案，并根据反馈确定主视觉方向”。',
+    });
+  }
+
+  if (text.length < 80) {
+    addIssue({
+      problem: '内容太短，信息密度不足',
+      why: '当前文本只能看出大概方向，看不出关键背景、动作和结果。',
+      direction: '至少补齐背景、目标、你的动作、结果四个部分。',
+      example: '用 4 句话分别写：项目背景、要解决的问题、你的具体动作、最终结果。',
+    });
+  }
+
+  if (issues.length === 0) {
+    addIssue({
+      problem: '材料已经有基础信息，但重点还不够集中',
+      why: '对方需要快速看到这份材料最想证明的能力，而不是自己从细节里猜。',
+      direction: '把最能证明目标的经历放到前面，并删掉弱相关描述。',
+      example: '开头先写“这段材料主要证明我能解决 X 问题”，再展开证据。',
+    });
+  }
+
+  return issues.slice(0, 5);
+}
+
+function createOptimizedMaterialSnippet(content: string, goal: string): string {
+  if (/(品牌|logo|包装|作品集|项目介绍|视觉)/i.test(content)) {
+    return `优化版项目介绍片段：
+这个项目围绕一个品牌视觉识别问题展开：如何让目标用户在短时间内理解品牌定位，并形成稳定记忆点。
+我负责从品牌关键词、竞品视觉和使用场景出发，确定视觉方向，并将它落实到 Logo、包装和延展物料中。
+相比只展示最终图形，我会在作品集中补充 2-3 张过程证据：关键词推导、方案取舍和最终应用效果。
+这样呈现后，评审看到的不只是“做了 Logo 和包装”，而是我如何把真实需求转化为视觉系统。`;
+  }
+
+  if (/(简历|岗位|办公软件|沟通能力|项目|视觉设计)/i.test(content)) {
+    return `优化版简历片段：
+面向视觉设计岗位，我具备基础排版、视觉执行和项目协作能力。
+在校内项目中，我参与视觉方案整理与设计执行，负责将需求转化为版式、Logo 或包装等具体交付物。
+相比只写“熟练掌握办公软件、性格开朗”，我会补充 1-2 个具体项目：项目目标、我负责的部分、使用的工具、最终产出和收到的反馈。
+下一版简历应优先把“我做过什么结果”放在前面，而不是堆通用能力词。`;
+  }
+
+  if (/(申请材料|个人陈述|ps|留学|申请)/i.test(content)) {
+    return `优化版申请材料片段：
+我的申请动机不是泛泛地追求更好的平台，而是来自一个具体问题：${goal || '我希望证明自己的目标方向'}。
+过去的经历让我意识到，我需要进一步补足方法、视野和实践环境。
+因此，这份申请材料应重点呈现三件事：我遇到过什么真实问题，我采取过什么行动，以及这些行动如何指向未来的学习目标。`;
+  }
+
+  return `优化版片段：
+这份材料需要先明确它要证明什么：${goal || '一个清晰的目标'}。
+建议改成“背景 -> 问题 -> 我的动作 -> 结果 -> 下一步”的结构。
+第一段先删掉泛泛评价，改为说明真实场景和目标对象。
+第二段写清楚你具体做了什么，以及为什么这样做。
+最后补一个可观察结果，让对方能够判断这段材料是否有效。`;
+}
+
+function buildManualMaterialAnalysisMaterials(
+  attachedContext: AttachedContextInput,
+  target: string
+): SolutionPack['materials'] {
+  const issues = analyzeManualMaterial(attachedContext.content, target);
+  const issueChecklist = issues
+    .map((issue, index) => `${index + 1}. ${issue.problem}\n   为什么影响效果：${issue.why}`)
+    .join('\n');
+  const adviceTable = [
+    '| 原问题 | 修改方向 | 示例改法 |',
+    '| --- | --- | --- |',
+    ...issues.map(issue => `| ${issue.problem} | ${issue.direction} | ${issue.example} |`),
+  ].join('\n');
+  const nextChecklist = [
+    '下一步检查清单：',
+    '- 开头是否说明了目标对象和真实问题？',
+    '- 是否删掉了“熟练、开朗、还可以、感觉”等泛泛评价？',
+    '- 是否补充了你的具体动作、方法或判断过程？',
+    '- 是否有结果、反馈、数据或交付物作为证据？',
+    '- 是否先修改了最影响判断的前 1/3 内容？',
+  ].join('\n');
+
+  return [
+    {
+      id: 'material-1',
+      type: 'checklist',
+      title: '材料问题清单',
+      purpose: '先找出这份材料最影响判断的具体问题。',
+      content: issueChecklist,
+      usageInstruction: '先逐条核对这些问题，优先处理前两个最影响效果的点。',
+    },
+    {
+      id: 'material-2',
+      type: 'table',
+      title: '修改建议表',
+      purpose: '把问题转成可以直接修改的方向和示例。',
+      content: adviceTable,
+      usageInstruction: '从第一行开始改，不要同时重写整份材料。',
+    },
+    {
+      id: 'material-3',
+      type: 'document_template',
+      title: '优化版片段',
+      purpose: '提供一段可以直接替换或参考的表达版本。',
+      content: createOptimizedMaterialSnippet(attachedContext.content, target),
+      usageInstruction: '复制这段结构，替换成你的真实经历、项目或申请信息。',
+    },
+    {
+      id: 'material-4',
+      type: 'checklist',
+      title: '下一步检查清单',
+      purpose: '确认修改后的材料是否已经从泛泛描述变成可判断证据。',
+      content: nextChecklist,
+      usageInstruction: '修改完一个关键段落后，用这份清单检查是否可以给别人看。',
+    },
+  ];
 }
 
 function createMaterialContent(
@@ -538,8 +747,14 @@ function buildMaterials(
   profile: FutureProfile,
   action: ActionItem,
   target: string,
-  obstacle: string
+  obstacle: string,
+  attachedContext?: AttachedContextInput
 ): SolutionPack['materials'] {
+  const normalizedAttachedContext = normalizeAttachedContext(attachedContext);
+  if (shape === 'analyze_existing_material' && normalizedAttachedContext) {
+    return buildManualMaterialAnalysisMaterials(normalizedAttachedContext, target);
+  }
+
   const contextText = compactText([
     profile.currentSituation,
     profile.currentGoal,
@@ -705,7 +920,8 @@ function buildProblemUnderstanding(
   target: string,
   interpretedProblem: string,
   obstacle: string,
-  missingInformation: string[]
+  missingInformation: string[],
+  attachedContext?: AttachedContextInput
 ): ProblemUnderstanding {
   const knownContext = [
     profile.currentSituation,
@@ -717,6 +933,8 @@ function buildProblemUnderstanding(
     action.reason,
   ].filter((item): item is string => Boolean(item));
 
+  const attachedContextSummary = summarizeAttachedContext(attachedContext);
+
   return {
     problemShape: shape,
     userProblem: profile.currentSituation || profile.currentGoal || interpretedProblem,
@@ -727,13 +945,16 @@ function buildProblemUnderstanding(
     missingInformation,
     requiresFileAnalysis: shape === 'analyze_existing_material',
     requiresUserFeedback: true,
+    hasManualMaterialText: Boolean(attachedContextSummary),
+    attachedContext: attachedContextSummary,
   };
 }
 
 export function createSolutionPackFromRadar(
   radar: OpportunityRadarV4,
   profile: FutureProfile,
-  userStateProfile?: Partial<UserStateProfile>
+  userStateProfile?: Partial<UserStateProfile>,
+  options: SolutionPackOptions = {}
 ): SolutionPack {
   const tonightAction = radar.actions?.find(action => action.time === '今晚') || radar.actions?.[0];
   const action = tonightAction || {
@@ -744,6 +965,7 @@ export function createSolutionPackFromRadar(
   };
   const shape = inferProblemShape(profile, userStateProfile, action);
   const plans = getCapabilityPlans(shape);
+  const attachedContext = normalizeAttachedContext(options.attachedContext);
   const target = profile.currentGoal || profile.desiredOutcome || radar.impactOnUser?.opportunity || action.task;
   const interpretedProblem = radar.coreInsight?.['真正的问题是什么']
     || radar.impactOnUser?.currentProblem
@@ -752,12 +974,12 @@ export function createSolutionPackFromRadar(
   const obstacle = radar.impactOnUser?.currentProblem
     || userStateProfile?.problemStatement
     || interpretedProblem;
-  const materials = buildMaterials(shape, plans, profile, action, target, obstacle);
+  const materials = buildMaterials(shape, plans, profile, action, target, obstacle, attachedContext);
   const materialIds = materials.slice(0, 2).map(material => material.id);
   const missingInformation = [
     profile.currentSkills ? '' : '当前能力基础',
     profile.weeklyTime ? '' : '每周可投入时间',
-    shape === 'analyze_existing_material' ? '材料原文或关键片段' : '',
+    shape === 'analyze_existing_material' && !attachedContext ? '材料原文或关键片段' : '',
     '执行后的真实结果',
   ].filter(Boolean);
   const problemUnderstanding = buildProblemUnderstanding(
@@ -767,7 +989,8 @@ export function createSolutionPackFromRadar(
     target,
     interpretedProblem,
     obstacle,
-    missingInformation
+    missingInformation,
+    attachedContext
   );
   const capabilityRoute = buildCapabilityRoute(problemUnderstanding);
   const executionPlan = buildExecutionPlan(problemUnderstanding, capabilityRoute);
@@ -804,16 +1027,32 @@ export function createSolutionPackFromRadar(
     })),
     materials,
     todayTask: {
-      title: action.task,
-      task: action.action || action.task,
+      title: shape === 'analyze_existing_material'
+        ? attachedContext
+          ? '根据问题清单修改材料前 1/3 内容'
+          : '先粘贴你要分析的材料文本'
+        : action.task,
+      task: shape === 'analyze_existing_material'
+        ? attachedContext
+          ? '根据材料问题清单，先修改最影响判断的一个关键段落。'
+          : '把简历、作品集介绍、汇报稿或申请材料等文字粘贴进分析框。'
+        : action.action || action.task,
       estimatedTime: profile.weeklyTime?.includes('0') ? '15-30分钟' : '30-60分钟',
       requiredMaterialIds: materialIds,
-      executionSteps: [
-        `打开材料：${materialIds.join('、')}`,
-        materials[0]?.usageInstruction || '先完成最小行动。',
-        action.action || action.task,
-        `按完成标准记录结果：${getCompletionCriteria(shape, action).minimumDone}`,
-      ],
+      executionSteps: shape === 'analyze_existing_material' && !attachedContext
+        ? [
+            '复制你要分析的材料正文。',
+            '粘贴到“粘贴你要分析的材料”区域。',
+            '点击“分析这份材料”。',
+          ]
+        : [
+            `打开材料：${materialIds.join('、')}`,
+            materials[0]?.usageInstruction || '先完成最小行动。',
+            shape === 'analyze_existing_material'
+              ? '先修改最影响判断的一个关键段落。'
+              : action.action || action.task,
+            `按完成标准记录结果：${getCompletionCriteria(shape, action).minimumDone}`,
+          ],
     },
     completionCriteria: getCompletionCriteria(shape, action),
     feedbackQuestions: getFeedbackQuestions(shape, materials),
@@ -846,10 +1085,13 @@ export function createSolutionPackFromRadar(
 export function ensureSolutionPack(
   radar: OpportunityRadarV4,
   profile: FutureProfile,
-  userStateProfile?: Partial<UserStateProfile>
+  userStateProfile?: Partial<UserStateProfile>,
+  options: SolutionPackOptions = {}
 ): OpportunityRadarV4 {
   const existing = radar.solutionPack;
   if (
+    !options.attachedContext
+    &&
     existing?.problemSummary
     && existing.problemShape
     && existing.coreObstacle
@@ -872,6 +1114,6 @@ export function ensureSolutionPack(
 
   return {
     ...radar,
-    solutionPack: createSolutionPackFromRadar(radar, profile, userStateProfile),
+    solutionPack: createSolutionPackFromRadar(radar, profile, userStateProfile, options),
   };
 }

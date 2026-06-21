@@ -20,7 +20,7 @@ export const capabilityRegistry: Capability[] = [
     description: '分析简历、作品、文档或表格等用户已有材料。',
     category: 'analysis',
     defaultExecutorId: 'not_available_yet',
-    availableExecutorIds: ['not_available_yet', 'pdf_parser', 'docx_parser'],
+    availableExecutorIds: ['not_available_yet', 'manual_text_input_fallback', 'pdf_parser', 'docx_parser'],
     currentStatus: 'unavailable',
     requiresUserInput: true,
     requiresAuthorization: false,

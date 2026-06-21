@@ -34,6 +34,14 @@ export const executorRegistry: Executor[] = [
     userVisibleMethod: '需要用户输入',
   },
   {
+    id: 'manual_text_input_fallback',
+    name: '粘贴文本分析',
+    description: '用户手动粘贴材料文本后，由当前文本生成能力进行材料分析。',
+    currentStatus: 'simulated',
+    isSimulated: true,
+    userVisibleMethod: '粘贴文本分析',
+  },
+  {
     id: 'not_available_yet',
     name: '暂不可用',
     description: '当前版本尚未接入该能力的真实执行器。',

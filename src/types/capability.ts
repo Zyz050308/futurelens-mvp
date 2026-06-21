@@ -30,6 +30,7 @@ export type ExecutorId =
   | 'markdown_table_generator'
   | 'page_task_display'
   | 'manual_context_only'
+  | 'manual_text_input_fallback'
   | 'not_available_yet'
   | 'search_api'
   | 'pdf_parser'
@@ -42,7 +43,14 @@ export type ExecutorId =
 
 export type CapabilityStatus = 'simulated' | 'available' | 'planned' | 'unavailable';
 
-export type ExecutionStepStatus = 'planned' | 'pending' | 'completed' | 'blocked';
+export type ExecutionStepStatus = 'planned' | 'pending' | 'completed' | 'blocked' | 'waiting_user';
+
+export type AttachedContextSummary = {
+  type: 'pasted_text';
+  label?: string;
+  contentPreview: string;
+  charCount: number;
+};
 
 export type ProblemUnderstanding = {
   problemShape: ProblemShapeId;
@@ -54,6 +62,8 @@ export type ProblemUnderstanding = {
   missingInformation: string[];
   requiresFileAnalysis: boolean;
   requiresUserFeedback: boolean;
+  hasManualMaterialText: boolean;
+  attachedContext?: AttachedContextSummary;
 };
 
 export type Capability = {
