@@ -1,3 +1,5 @@
+import type { CapabilityRouteItem, ExecutionPlan, ProblemUnderstanding } from './capability';
+
 export type FutureProfile = {
   age: string;
   education: string;
@@ -237,10 +239,13 @@ export type ProblemShape =
   | 'create_output'
   | 'make_decision'
   | 'validate_opportunity'
-  | 'solve_specific_task';
+  | 'solve_specific_task'
+  | 'research_information'
+  | 'analyze_existing_material';
 
 export type CapabilityName =
   | 'search_information'
+  | 'analyze_file'
   | 'generate_learning_plan'
   | 'generate_exercises'
   | 'generate_explanation'
@@ -330,6 +335,9 @@ export type SolutionPack = {
     nextMove: string;
     capabilityToUseNext?: CapabilityName;
   }>;
+  problemUnderstanding?: ProblemUnderstanding;
+  capabilityRoute?: CapabilityRouteItem[];
+  executionPlan?: ExecutionPlan;
 };
 
 // V5.5 Personal Impact 类型

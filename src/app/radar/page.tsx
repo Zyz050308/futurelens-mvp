@@ -685,10 +685,13 @@ const problemShapeLabels: Record<ProblemShape, string> = {
   make_decision: '做出一个选择',
   validate_opportunity: '验证一个机会',
   solve_specific_task: '解决一个具体任务',
+  research_information: '补齐关键信息',
+  analyze_existing_material: '分析已有材料',
 };
 
 const capabilityLabels: Record<CapabilityName, string> = {
   search_information: '信息搜索',
+  analyze_file: '文件分析',
   generate_learning_plan: '学习计划生成',
   generate_exercises: '练习材料生成',
   generate_explanation: '解释说明生成',
@@ -756,6 +759,76 @@ function SolutionMaterialCard({ material }: { material: SolutionPack['materials'
   );
 }
 
+function getExecutionMethodLabel(route: NonNullable<SolutionPack['capabilityRoute']>[number]): string {
+  if (route.capabilityStatus === 'unavailable' || route.executorStatus === 'unavailable') {
+    return '暂不可用';
+  }
+  if (route.requiresUserInput && !route.canRunAutomatically) {
+    return route.executionMethod || '需要用户输入';
+  }
+  if (route.isSimulated) {
+    return route.executionMethod || 'DeepSeek 模拟';
+  }
+  return route.executionMethod || '页面展示';
+}
+
+function CapabilityRouteMiniPanel({ solutionPack }: { solutionPack: SolutionPack }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const route = solutionPack.capabilityRoute || [];
+  const nextUserStep = solutionPack.executionPlan?.nextUserStep;
+
+  if (route.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-[#E1ECFF] bg-[#F8FAFD] p-4">
+      <button
+        type="button"
+        onClick={() => setIsOpen(value => !value)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div>
+          <div className="text-xs font-semibold text-[#007AFF]">系统如何解决这个问题</div>
+          <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">
+            先判断需要哪些能力，再把能力组织成材料、任务和反馈。
+          </p>
+        </div>
+        {isOpen ? <ChevronUp className="h-4 w-4 text-[#6B7280]" /> : <ChevronDown className="h-4 w-4 text-[#6B7280]" />}
+      </button>
+
+      {isOpen && (
+        <div className="mt-4 space-y-3">
+          <div className="grid gap-2">
+            {route.slice(0, 5).map(item => (
+              <div key={item.routeId} className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#E5EAF3]">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm font-semibold text-[#1D1D1F]">{item.capabilityName}</div>
+                  <div className="w-fit rounded-full bg-[#EEF5FF] px-2 py-0.5 text-[11px] font-medium text-[#3B6EA8]">
+                    {getExecutionMethodLabel(item)}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">{item.reason}</p>
+                {item.fallbackInstruction && (
+                  <p className="mt-1 text-xs leading-relaxed text-[#C9342D]">{item.fallbackInstruction}</p>
+                )}
+                {item.futureExecutorNames && item.futureExecutorNames.length > 0 && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-[#9CA3AF]">
+                    后续可接入：{item.futureExecutorNames.join('、')}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          {nextUserStep && (
+            <div className="rounded-xl bg-white px-3 py-2.5 text-xs leading-relaxed text-[#4B5563] ring-1 ring-[#E5EAF3]">
+              <span className="font-semibold text-[#1D1D1F]">下一步：</span>{nextUserStep}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps) {
   if (!solutionPack) return null;
 
@@ -818,6 +891,8 @@ function SolutionPackPreviewCard({ solutionPack }: SolutionPackPreviewCardProps)
             ))}
           </div>
         </div>
+
+        <CapabilityRouteMiniPanel solutionPack={solutionPack} />
 
         <div>
           <div className="text-xs font-semibold text-[#9CA3AF] mb-2">执行材料</div>

@@ -8,6 +8,9 @@ import type {
   SolutionPack,
   UserStateProfile,
 } from '@/types/radar';
+import type { ProblemUnderstanding } from '@/types/capability';
+import { buildCapabilityRoute } from './capabilityRouter';
+import { buildExecutionPlan } from './executionPlanner';
 
 type CapabilityPlan = {
   capability: CapabilityName;
@@ -59,12 +62,36 @@ function hasUrgentConcreteTask(text: string): boolean {
   return hasTimePressure && hasConcreteTask;
 }
 
+function needsExistingMaterialAnalysis(text: string): boolean {
+  const hasExistingMaterial = /(已有|现有|一份|这份|我的)?(简历|作品集|作品|文档|文件|材料|报告|ppt|pdf|word|表格|方案|介绍页)/i.test(text);
+  const asksForReview = /(修改|优化|分析|哪里|问题|不足|建议|改进|检查|润色|诊断|反馈|评估)/i.test(text);
+
+  return hasExistingMaterial && asksForReview;
+}
+
+function needsResearchInformation(text: string): boolean {
+  const asksForInformation = /(搜索|查找|资料|信息|案例|调研|研究|了解|收集|整理)/i.test(text);
+  const isOnlyInformationGap = /(不知道|不清楚|不了解|缺少|没有资料|没有信息|从哪找|哪里找)/i.test(text);
+
+  return asksForInformation && isOnlyInformationGap;
+}
+
 export function inferProblemShape(
   profile: FutureProfile,
   userStateProfile?: Partial<UserStateProfile>,
   action?: ActionItem
 ): ProblemShape {
+  const primaryText = compactText([
+    getProfileText(profile),
+    userStateProfile?.problemStatement,
+    userStateProfile?.validationQuestion,
+    userStateProfile?.actionDirective,
+  ]);
   const text = getProblemText(profile, userStateProfile, action);
+
+  if (needsExistingMaterialAnalysis(text)) {
+    return 'analyze_existing_material';
+  }
 
   if (userStateProfile?.problemType === 'monetization_validation') {
     return 'validate_opportunity';
@@ -74,7 +101,7 @@ export function inferProblemShape(
     return 'learn_capability';
   }
 
-  if (hasUrgentConcreteTask(text)) {
+  if (hasUrgentConcreteTask(primaryText)) {
     return 'solve_specific_task';
   }
 
@@ -95,11 +122,15 @@ export function inferProblemShape(
     return 'build_workflow';
   }
 
+  if (needsResearchInformation(text)) {
+    return 'research_information';
+  }
+
   if (/(选择|取舍|比较|要不要|该不该|方向|路径|哪个|考研|找工作)/i.test(text)) {
     return 'make_decision';
   }
 
-  if (/(验证|客户|用户|付费|询价|副业|创业|接单|需求|机会|mvp|愿意买|愿意付)/i.test(text)) {
+  if (/(验证|客户|用户访谈|目标用户|真实用户|付费|询价|副业|创业|接单|需求|机会|mvp|愿意买|愿意付)/i.test(text)) {
     return 'validate_opportunity';
   }
 
@@ -137,7 +168,7 @@ function getCapabilityPlans(shape: ProblemShape): CapabilityPlan[] {
       { capability: 'generate_checklist', materialType: 'checklist', title: '决策标准清单', purpose: '明确哪些证据足以推动下一步。', priority: 'medium' },
     ],
     validate_opportunity: [
-      { capability: 'run_validation_design', materialType: 'review_form', title: '机会验证表', purpose: '确认真实对象是否有需求和付费信号。', priority: 'high' },
+      { capability: 'generate_review_form', materialType: 'review_form', title: '机会验证表', purpose: '确认真实对象是否有需求和付费信号。', priority: 'high' },
       { capability: 'generate_message_template', materialType: 'message_template', title: '验证沟通话术', purpose: '降低接触真实对象的行动门槛。', priority: 'high' },
       { capability: 'generate_table', materialType: 'table', title: '反馈记录表', purpose: '记录兴趣、询价、拒绝和沉默。', priority: 'medium' },
     ],
@@ -145,6 +176,16 @@ function getCapabilityPlans(shape: ProblemShape): CapabilityPlan[] {
       { capability: 'generate_checklist', materialType: 'checklist', title: '最小交付清单', purpose: '先完成明天或今晚必须能交付的版本。', priority: 'high' },
       { capability: 'generate_document', materialType: 'document_template', title: '任务准备模板', purpose: '把汇报、面试或提交内容组织成可执行结构。', priority: 'high' },
       { capability: 'track_task', materialType: 'table', title: '最后检查表', purpose: '确认剩余时间内最应该补哪一步。', priority: 'medium' },
+    ],
+    research_information: [
+      { capability: 'search_information', materialType: 'table', title: '资料检索记录表', purpose: '把需要补齐的信息变成可记录、可比较的事实。', priority: 'high' },
+      { capability: 'generate_table', materialType: 'table', title: '信息对比表', purpose: '把不同来源的信息放到同一标准下整理。', priority: 'high' },
+      { capability: 'generate_document', materialType: 'document_template', title: '研究结论模板', purpose: '把资料整理成能够支持下一步判断的结论。', priority: 'medium' },
+    ],
+    analyze_existing_material: [
+      { capability: 'analyze_file', materialType: 'review_form', title: '材料分析入口', purpose: '先确认现有材料里最影响结果的问题。', priority: 'high' },
+      { capability: 'generate_checklist', materialType: 'checklist', title: '修改检查清单', purpose: '把材料问题变成今天可以逐项修改的清单。', priority: 'high' },
+      { capability: 'generate_document', materialType: 'document_template', title: '修改稿结构', purpose: '把修改方向整理成可继续完善的版本。', priority: 'medium' },
     ],
   };
 
@@ -159,6 +200,8 @@ function getShapeLabel(shape: ProblemShape): string {
     make_decision: '做出一个选择',
     validate_opportunity: '验证一个机会',
     solve_specific_task: '解决一个具体任务',
+    research_information: '补齐关键信息',
+    analyze_existing_material: '分析已有材料',
   };
   return labels[shape];
 }
@@ -382,6 +425,54 @@ function createMaterialContent(
 | 3 |  |  |  |  |  |`;
   }
 
+  if (shape === 'research_information') {
+    if (plan.materialType === 'table') {
+      return `| 需要确认的问题 | 资料来源 | 关键事实 | 可信度 | 对下一步的影响 |
+| --- | --- | --- | --- | --- |
+| ${goal} 里最缺的事实是什么？ |  |  | 高/中/低 |  |
+| 有没有真实案例或样本？ |  |  | 高/中/低 |  |
+| 哪条信息会改变你的判断？ |  |  | 高/中/低 |  |`;
+    }
+
+    return `研究结论模板：
+1. 我原本想确认的问题：${goal}
+2. 已经确认的事实：
+3. 仍然不确定的地方：
+4. 最影响下一步判断的信息：
+5. 今天先根据哪条信息采取一个小动作：`;
+  }
+
+  if (shape === 'analyze_existing_material') {
+    if (plan.capability === 'analyze_file') {
+      return `当前版本还不能直接读取附件。
+请先粘贴材料中的关键文本，或用下面格式描述这份材料：
+1. 材料类型：简历 / 作品集 / 报告 / PPT / 方案 / 其他
+2. 目标对象：它要给谁看？
+3. 希望达到的结果：${goal}
+4. 你最担心的问题：
+5. 粘贴最重要的 3-5 段内容：
+
+FutureLens 会先基于你粘贴的文本做结构分析，后续再接入文件解析。`;
+    }
+
+    if (plan.materialType === 'checklist') {
+      return `材料修改检查清单：
+- 这份材料是否在前 30 秒说明了目标？
+- 是否能看出你解决了什么具体问题？
+- 是否有事实、数据、过程或结果支撑？
+- 是否存在只有经历堆砌、没有判断逻辑的部分？
+- 哪一段最应该先删、先改或先补证据？
+- 修改后是否可以直接发给目标对象查看？`;
+    }
+
+    return `修改稿结构：
+1. 开头一句话：这份材料想证明什么？
+2. 关键经历或内容：只保留最能证明目标的部分。
+3. 证据：补充数据、结果、过程或他人反馈。
+4. 风险：标出最不确定、最容易被质疑的地方。
+5. 下一版动作：今天先改最影响结果的一段。`;
+  }
+
   if (plan.materialType === 'checklist') {
     const presentationLine = isSpeechOrPresentation(goal)
       ? '- 汇报结构是否包含：开场结论、3个重点、证据、结尾行动？'
@@ -432,6 +523,8 @@ function getUsageInstruction(shape: ProblemShape, index: number): string {
       make_decision: '今晚先填表，不急着做最终选择，重点找出最关键的不确定项。',
       validate_opportunity: '今晚先联系真实对象，把对方原话记录下来。',
       solve_specific_task: '今晚先完成最小可交付版本，确保明天能用。',
+      research_information: '今晚先补齐最影响判断的一条信息，不追求查全。',
+      analyze_existing_material: '今晚先粘贴或整理材料关键文本，再按清单改最影响结果的一段。',
     };
     return firstUse[shape];
   }
@@ -505,6 +598,16 @@ function getCompletionCriteria(shape: ProblemShape, action: ActionItem): Solutio
       goodEnoughResult: '这个版本已经能直接进入汇报、提交、面试或执行，剩余问题不影响基本交付。',
       evidenceToRecord: '最小版本是否完成、还缺哪一部分、是否预演或检查、最后30分钟优先补什么。',
     },
+    research_information: {
+      minimumDone: '补齐最影响判断的一条关键信息，并记录来源、事实和可信度。',
+      goodEnoughResult: '这条信息足以支持你排除一个错误假设，或明确下一步要验证什么。',
+      evidenceToRecord: '查到了什么、来源是什么、可信度如何、它改变了哪个判断。',
+    },
+    analyze_existing_material: {
+      minimumDone: '整理或粘贴材料关键文本，并找出最影响结果的一个修改点。',
+      goodEnoughResult: '能明确这份材料最先该改哪里，以及修改后要让谁看或如何验证。',
+      evidenceToRecord: '材料类型、最明显问题、先改哪一段、是否需要补证据或重写表达。',
+    },
   };
 
   return criteria[shape];
@@ -555,6 +658,18 @@ function getFeedbackQuestions(shape: ProblemShape, materials: SolutionPack['mate
       { key: 'rehearsed', question: '是否已经预演或检查一遍？', answerType: 'boolean' },
       { key: 'last_priority', question: '剩余时间内最应该补哪一步？', answerType: 'text' },
     ],
+    research_information: [
+      { key: 'found_information', question: '今天查到了哪条最关键的信息？', answerType: 'text' },
+      { key: 'source_quality', question: '这个来源是否足够可信？', answerType: 'choice', options: ['可信', '一般', '不可信', '还需要交叉验证'] },
+      { key: 'changed_judgment', question: '这条信息改变了你原来的哪个判断？', answerType: 'text' },
+      { key: 'remaining_gap', question: '还缺哪一条信息才能继续推进？', answerType: 'text' },
+    ],
+    analyze_existing_material: [
+      { key: 'material_type', question: '你分析的是哪类材料？', answerType: 'text' },
+      { key: 'biggest_issue', question: '最明显的问题是什么？', answerType: 'text' },
+      { key: 'first_revision', question: '今天最先改哪一段或哪一页？', answerType: 'text' },
+      { key: 'needs_evidence', question: '是否需要补充证据、数据或过程？', answerType: 'boolean' },
+    ],
   };
 
   return [...questions[shape], usefulMaterialQuestion];
@@ -583,6 +698,38 @@ function getSolutionPath(shape: ProblemShape, action: ActionItem, obstacle: stri
   ];
 }
 
+function buildProblemUnderstanding(
+  shape: ProblemShape,
+  profile: FutureProfile,
+  action: ActionItem,
+  target: string,
+  interpretedProblem: string,
+  obstacle: string,
+  missingInformation: string[]
+): ProblemUnderstanding {
+  const knownContext = [
+    profile.currentSituation,
+    profile.currentGoal,
+    profile.currentAnxiety,
+    profile.currentSkills,
+    profile.majorOrCareer,
+    action.task,
+    action.reason,
+  ].filter((item): item is string => Boolean(item));
+
+  return {
+    problemShape: shape,
+    userProblem: profile.currentSituation || profile.currentGoal || interpretedProblem,
+    targetOutcome: target,
+    coreObstacle: obstacle,
+    timeConstraint: profile.weeklyTime || undefined,
+    knownContext,
+    missingInformation,
+    requiresFileAnalysis: shape === 'analyze_existing_material',
+    requiresUserFeedback: true,
+  };
+}
+
 export function createSolutionPackFromRadar(
   radar: OpportunityRadarV4,
   profile: FutureProfile,
@@ -607,16 +754,29 @@ export function createSolutionPackFromRadar(
     || interpretedProblem;
   const materials = buildMaterials(shape, plans, profile, action, target, obstacle);
   const materialIds = materials.slice(0, 2).map(material => material.id);
+  const missingInformation = [
+    profile.currentSkills ? '' : '当前能力基础',
+    profile.weeklyTime ? '' : '每周可投入时间',
+    shape === 'analyze_existing_material' ? '材料原文或关键片段' : '',
+    '执行后的真实结果',
+  ].filter(Boolean);
+  const problemUnderstanding = buildProblemUnderstanding(
+    shape,
+    profile,
+    action,
+    target,
+    interpretedProblem,
+    obstacle,
+    missingInformation
+  );
+  const capabilityRoute = buildCapabilityRoute(problemUnderstanding);
+  const executionPlan = buildExecutionPlan(problemUnderstanding, capabilityRoute);
 
   return {
     problemSummary: {
       userOriginalProblem: profile.currentSituation || profile.currentGoal || '用户还没有明确描述问题。',
       interpretedProblem,
-      missingInformation: [
-        profile.currentSkills ? '' : '当前能力基础',
-        profile.weeklyTime ? '' : '每周可投入时间',
-        '执行后的真实结果',
-      ].filter(Boolean),
+      missingInformation,
     },
     problemShape: shape,
     coreObstacle: {
@@ -677,6 +837,9 @@ export function createSolutionPackFromRadar(
         capabilityToUseNext: 'update_plan_from_feedback',
       },
     ],
+    problemUnderstanding,
+    capabilityRoute,
+    executionPlan,
   };
 }
 
@@ -700,6 +863,9 @@ export function ensureSolutionPack(
     && existing.completionCriteria
     && Array.isArray(existing.feedbackQuestions)
     && Array.isArray(existing.nextAdjustmentLogic)
+    && existing.problemUnderstanding
+    && Array.isArray(existing.capabilityRoute)
+    && existing.executionPlan
   ) {
     return radar;
   }

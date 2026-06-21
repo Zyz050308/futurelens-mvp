@@ -1,0 +1,113 @@
+import type { Executor, ExecutorId } from '@/types/capability';
+
+export const executorRegistry: Executor[] = [
+  {
+    id: 'deepseek_text_generation',
+    name: 'DeepSeek 文本生成',
+    description: '用当前大模型能力生成计划、解释、文档、话术和清单。',
+    currentStatus: 'simulated',
+    isSimulated: true,
+    userVisibleMethod: 'DeepSeek 模拟生成',
+  },
+  {
+    id: 'markdown_table_generator',
+    name: '页面表格生成',
+    description: '在页面内生成可复制的 Markdown 表格和记录表。',
+    currentStatus: 'simulated',
+    isSimulated: true,
+    userVisibleMethod: '页面生成',
+  },
+  {
+    id: 'page_task_display',
+    name: '页面任务展示',
+    description: '把今日任务和反馈入口展示在当前页面。',
+    currentStatus: 'available',
+    isSimulated: false,
+    userVisibleMethod: '页面展示',
+  },
+  {
+    id: 'manual_context_only',
+    name: '用户手动提供信息',
+    description: '暂不调用外部工具，由用户粘贴或补充关键信息。',
+    currentStatus: 'available',
+    isSimulated: false,
+    userVisibleMethod: '需要用户输入',
+  },
+  {
+    id: 'not_available_yet',
+    name: '暂不可用',
+    description: '当前版本尚未接入该能力的真实执行器。',
+    currentStatus: 'unavailable',
+    isSimulated: false,
+    userVisibleMethod: '暂不可用',
+  },
+  {
+    id: 'search_api',
+    name: '搜索接口',
+    description: '未来用于检索外部资料和公开信息。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可接入搜索',
+  },
+  {
+    id: 'pdf_parser',
+    name: 'PDF 解析器',
+    description: '未来用于读取和分析用户上传的 PDF 文件。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可接入 PDF 解析',
+  },
+  {
+    id: 'docx_parser',
+    name: 'Word 解析器',
+    description: '未来用于读取和分析用户上传的 Word 文件。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可接入 Word 解析',
+  },
+  {
+    id: 'excel_exporter',
+    name: 'Excel 导出',
+    description: '未来用于把表格材料导出为 Excel。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可导出 Excel',
+  },
+  {
+    id: 'word_exporter',
+    name: 'Word 导出',
+    description: '未来用于把文档材料导出为 Word。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可导出 Word',
+  },
+  {
+    id: 'pdf_exporter',
+    name: 'PDF 导出',
+    description: '未来用于把解决方案包导出为 PDF。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可导出 PDF',
+  },
+  {
+    id: 'calendar_api',
+    name: '日历接口',
+    description: '未来用于把任务安排写入日历。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可接入日历',
+  },
+  {
+    id: 'notification_system',
+    name: '提醒系统',
+    description: '未来用于提醒用户继续执行和反馈。',
+    currentStatus: 'planned',
+    isSimulated: false,
+    userVisibleMethod: '后续可接入提醒',
+  },
+];
+
+export function getExecutorById(id: ExecutorId): Executor {
+  return executorRegistry.find(executor => executor.id === id)
+    || executorRegistry.find(executor => executor.id === 'not_available_yet')!;
+}
