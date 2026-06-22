@@ -35,7 +35,10 @@ function toTimestamp(value: string): number {
 function toPublicUser(user: UserRecord): PublicUser {
   return {
     id: user.id,
+    publicUid: user.publicUid,
+    nickname: user.nickname,
     email: user.email,
+    role: user.role,
     emailVerifiedAt: user.emailVerifiedAt,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
@@ -89,6 +92,14 @@ export async function verifyLoginCode(
   code: string,
   options: VerifyLoginCodeOptions = {}
 ) {
+  const user = await getUserForValidLoginCode(emailInput, code);
+  return issueSessionForUser(user, options);
+}
+
+export async function getUserForValidLoginCode(
+  emailInput: string,
+  code: string
+): Promise<UserRecord> {
   const email = normalizeEmail(emailInput);
   const user = await findUserByEmail(email);
   if (!user || !user.loginCodeHash || !user.loginCodeExpiresAt) {
@@ -104,6 +115,13 @@ export async function verifyLoginCode(
     throw new Error('Login code invalid');
   }
 
+  return user;
+}
+
+export async function issueSessionForUser(
+  user: UserRecord,
+  options: VerifyLoginCodeOptions = {}
+) {
   const sessionToken = randomBytes(32).toString('hex');
   const nowMs = Date.now();
   const sessionExpiresAtMs = nowMs + SESSION_TTL_DAYS * DAY_MS;

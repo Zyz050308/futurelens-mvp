@@ -38,26 +38,26 @@ const EMPTY_PROFILE: FutureProfile = {
 const capabilities = [
   {
     icon: BrainCircuit,
-    title: '真正问题判断',
-    description: '从你的处境、目标和焦虑中，找到真正阻碍你前进的那一层。',
+    title: '看清卡点',
+    description: '把你说出的困惑拆开，找到现在真正卡住你的地方。',
     color: 'bg-[#EAF0FF] text-[#3157D5]',
   },
   {
     icon: Target,
-    title: '今晚先确认什么',
-    description: '不急着给长期答案，先找到当前最值得减少的一个未知。',
+    title: '告诉你先做什么',
+    description: '不急着给长期答案，先给出今天能开始的一步。',
     color: 'bg-[#E6F7F5] text-[#087B76]',
   },
   {
     icon: TrendingUp,
-    title: '变化对你意味着什么',
-    description: '把外部变化放回你的真实处境里，判断它会怎样影响你的选择。',
+    title: '准备能用的材料',
+    description: '把建议变成检查清单、修改建议、参考模板等可直接使用的内容。',
     color: 'bg-[#FFF3DE] text-[#A66100]',
   },
   {
     icon: History,
-    title: '记录反馈，持续更新',
-    description: '每次真实结果都会成为新的判断依据，让下一步越来越贴近现实。',
+    title: '做完再调整',
+    description: '记录做完后的结果，FutureLens 会继续帮你调整下一步。',
     color: 'bg-[#E8F7ED] text-[#247A47]',
   },
 ];
@@ -85,7 +85,7 @@ function ProductPreview() {
       <div className="absolute -left-3 top-24 z-0 hidden w-52 rounded-lg bg-white/90 p-4 shadow-[0_18px_45px_rgba(49,76,137,0.12),0_0_0_1px_rgba(200,211,233,0.55)] backdrop-blur md:block lg:left-0">
         <div className="mb-4 flex items-center gap-2 text-[11px] font-semibold text-[#52627D]">
           <TrendingUp className="h-3.5 w-3.5 text-[#3157D5]" />
-          今日变化
+          可用材料
         </div>
         <div className="space-y-3">
           <div className="h-2 w-4/5 rounded-full bg-[#DCE6FA]" />
@@ -102,14 +102,14 @@ function ProductPreview() {
       <div className="absolute -right-3 bottom-20 z-10 hidden w-56 rounded-lg bg-white/95 p-4 shadow-[0_20px_50px_rgba(49,76,137,0.14),0_0_0_1px_rgba(200,211,233,0.5)] backdrop-blur md:block lg:right-0">
         <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold text-[#52627D]">
           <Lightbulb className="h-3.5 w-3.5 text-[#D99A27]" />
-          最近发现
+          记录结果
         </div>
         <p className="text-xs leading-5 text-[#56657D]">
-          每次行动结果都会成为新的判断依据。
+          做完后记录哪里还卡。
         </p>
         <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#35A866]">
           <Check className="h-3 w-3" />
-          已更新当前判断
+          下一步已准备
         </div>
       </div>
 
@@ -119,12 +119,12 @@ function ProductPreview() {
             <BrandMark compact />
             <div>
               <p className="text-sm font-semibold text-[#172540]">你的 FutureLens</p>
-              <p className="text-[11px] text-[#8290A7]">基于你的处境与最近反馈</p>
+              <p className="text-[11px] text-[#8290A7]">从一个真实问题开始</p>
             </div>
           </div>
           <div className="hidden items-center gap-2 rounded-full bg-[#EAF7EF] px-3 py-1.5 text-xs font-medium text-[#247A47] sm:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[#35A866]" />
-            判断已更新
+            可以开始
           </div>
         </div>
 
@@ -135,17 +135,17 @@ function ProductPreview() {
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs font-semibold text-[#3157D5]">
                     <BrainCircuit className="h-4 w-4" />
-                    你的真正问题
+                    你的问题
                   </div>
                   <span className="rounded-full bg-[#F0F4FC] px-2.5 py-1 text-[10px] font-medium text-[#75839A]">
-                    当前判断
+                    已拆开
                   </span>
                 </div>
                 <p className="max-w-2xl text-lg font-semibold leading-8 text-[#172540] sm:text-xl">
-                  你不是缺少更多方向，而是还没有用真实结果判断，哪条路值得继续投入。
+                  你不是不知道要努力，而是不知道今天先改哪一部分。
                 </p>
                 <p className="mt-3 text-xs leading-5 text-[#7A879C]">
-                  先让一个关键未知变得可判断，再决定接下来把时间放在哪里。
+                  先把问题缩小到今天能处理的一件事。
                 </p>
               </section>
 
@@ -153,10 +153,10 @@ function ProductPreview() {
                 <section className="rounded-lg bg-[linear-gradient(145deg,#EDF3FF_0%,#F7F9FF_100%)] p-5 shadow-[0_8px_24px_rgba(43,69,124,0.05)]">
                   <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#3157D5]">
                     <CircleDot className="h-4 w-4 text-[#5374D8]" />
-                    今晚先确认什么
+                    今天先做
                   </div>
                   <p className="text-sm font-semibold leading-6 text-[#263755]">
-                    找一个最小行动，验证这个方向是否真的值得继续。
+                    先改一段最关键的内容，不要一次改完整份。
                   </p>
                   <div className="mt-5 flex items-center gap-2 text-xs text-[#7585A1]">
                     <Clock3 className="h-3.5 w-3.5" />
@@ -167,13 +167,13 @@ function ProductPreview() {
                 <section className="rounded-lg bg-white p-5 shadow-[0_8px_24px_rgba(43,69,124,0.06)]">
                   <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#172540]">
                     <Target className="h-4 w-4 text-[#3157D5]" />
-                    下一步行动
+                    可用材料
                   </div>
                   <p className="text-sm leading-6 text-[#43516A]">
-                    把模糊想法变成今晚能完成的一件小事。
+                    检查清单、修改建议、参考版本。
                   </p>
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-[11px] text-[#8793A8]">从最小一步开始</span>
+                    <span className="text-[11px] text-[#8793A8]">可以直接使用</span>
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EDF2FF] text-[#3157D5]">
                       <ArrowRight className="h-3.5 w-3.5" />
                     </span>
@@ -186,10 +186,10 @@ function ProductPreview() {
               <section className="rounded-lg bg-white p-5 shadow-[0_8px_24px_rgba(43,69,124,0.06)]">
                 <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-[#172540]">
                   <TrendingUp className="h-4 w-4 text-[#3157D5]" />
-                  今日变化
+                  继续调整
                 </div>
                 <p className="text-sm font-medium leading-6 text-[#33425D]">
-                  外部变化正在影响你的选择，但只有和你的处境结合才有意义。
+                  做完后记录哪里还卡，下一步继续缩小范围。
                 </p>
                 <div className="mt-4 flex items-end gap-1.5" aria-hidden="true">
                   {[32, 42, 37, 54, 49, 68, 78].map((height, index) => (
@@ -205,14 +205,14 @@ function ProductPreview() {
               <section className="rounded-lg bg-white p-5 shadow-[0_8px_24px_rgba(43,69,124,0.06)]">
                 <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-[#172540]">
                   <Lightbulb className="h-4 w-4 text-[#D99A27]" />
-                  最近发现
+                  最近结果
                 </div>
                 <p className="text-sm font-medium leading-6 text-[#43516A]">
-                  每次行动结果都会成为新的判断依据。
+                  写下实际发生了什么，下一步会更贴近现实。
                 </p>
                 <div className="mt-4 flex items-center gap-2 text-[11px] text-[#8190A6]">
                   <Sparkles className="h-3.5 w-3.5 text-[#6D8BE4]" />
-                  已用于更新当前判断
+                  结果会用于下一次建议
                 </div>
               </section>
             </div>
@@ -269,7 +269,7 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleStartAnalysis = (event: FormEvent<HTMLFormElement>) => {
+  const handleStartAnalysis = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     let existingDraft: Partial<FutureProfile> = {};
@@ -286,37 +286,56 @@ export default function HomePage() {
     };
 
     localStorage.setItem(PROFILE_DRAFT_KEY, JSON.stringify(draft));
+    if (concern.trim()) {
+      sessionStorage.setItem('futurelens-pending-problem', concern.trim());
+    }
+
+    if (!userEmail) {
+      router.push('/register?from=/profile');
+      return;
+    }
+
+    if (concern.trim()) {
+      try {
+        await fetch('/api/account', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ problem: concern.trim() }),
+        });
+      } catch {
+        // The local profile draft is enough to keep the existing Radar flow usable.
+      }
+    }
+
     router.push('/profile');
   };
 
   return (
     <div className="min-h-screen bg-white text-[#14213D]">
       <header className="sticky top-0 z-40 border-b border-[#E8EDF6] bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-3" aria-label="FutureLens 首页">
+        <div className="mx-auto grid h-[68px] max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-5 sm:px-8">
+          <Link href="/" className="flex items-center justify-self-start gap-3" aria-label="FutureLens 首页">
             <BrandMark compact />
             <span className="text-[19px] font-semibold tracking-[0.015em] text-[#152238]">FutureLens</span>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm text-[#58677F] md:flex">
+          <nav className="hidden items-center gap-10 justify-self-center text-sm text-[#58677F] md:flex lg:gap-11">
             <a href="#product-preview" className="transition-colors hover:text-[#3157D5]">产品预览</a>
-            <a href="#capabilities" className="transition-colors hover:text-[#3157D5]">核心能力</a>
-            <a href="#how-it-works" className="transition-colors hover:text-[#3157D5]">如何工作</a>
+            <a href="#capabilities" className="transition-colors hover:text-[#3157D5]">能做什么</a>
+            <a href="#how-it-works" className="transition-colors hover:text-[#3157D5]">怎么使用</a>
+            <Link href="/beta" className="transition-colors hover:text-[#3157D5]">加入内测</Link>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end">
             <Link
-              href={userEmail ? '/profile' : '/login'}
-              className="max-w-[136px] truncate px-2 text-sm font-medium text-[#40506B] transition-colors hover:text-[#3157D5]"
+              href={userEmail ? '/account' : '/login'}
+              className="max-w-[156px] truncate rounded-md bg-[#3157D5] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2748B8]"
               title={userEmail || '登录'}
             >
               {userEmail || '登录'}
-            </Link>
-            <Link
-              href="/profile"
-              className="hidden h-9 items-center rounded-md bg-[#3157D5] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2748B8] sm:inline-flex"
-            >
-              开始分析
             </Link>
           </div>
         </div>
@@ -324,25 +343,18 @@ export default function HomePage() {
 
       <main>
         <section className="relative overflow-hidden border-b border-[#EDF1F7] bg-[linear-gradient(180deg,#FFFFFF_0%,#F3F7FF_48%,#FAFCFF_82%,#FFFFFF_100%)]">
-          <div className="pointer-events-none absolute left-1/2 top-16 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[#DDE8FF]/55 blur-3xl" />
+          <div className="pointer-events-none absolute left-1/2 top-14 h-[440px] w-[960px] -translate-x-1/2 rounded-full bg-[#DDE8FF]/68 blur-3xl" />
 
-          <div className="relative mx-auto max-w-7xl px-5 pb-20 pt-14 sm:px-8 sm:pt-16 lg:pb-28 lg:pt-20">
-            <div className="mx-auto max-w-4xl text-center">
-              <div className="mb-5 hidden items-center gap-2 rounded-full border border-[#D7E1F6] bg-white/75 px-3.5 py-1.5 text-xs font-semibold text-[#3157D5] shadow-[0_5px_18px_rgba(67,94,157,0.06)] sm:inline-flex">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI 时代个人机会发现系统
-              </div>
-
-              <h1 className="text-[36px] font-semibold leading-[1.16] text-[#101D38] sm:text-5xl lg:text-[58px]">
-                看清你真正卡住的问题，
-                <br className="hidden sm:block" />
-                找到下一步
+          <div className="relative mx-auto max-w-7xl px-5 pb-24 pt-18 sm:px-8 sm:pt-22 lg:pb-32 lg:pt-24">
+            <div className="mx-auto max-w-5xl text-center">
+              <h1 className="text-[34px] font-bold leading-[1.12] text-[#101D38] sm:text-5xl lg:text-[56px]">
+                说出问题，拿到下一步
               </h1>
 
               <p className="mx-auto mt-5 max-w-3xl text-sm leading-6 text-[#61708A] sm:text-base sm:leading-7">
-                把你最近最纠结的事告诉 FutureLens。它会帮你看清真正卡点，
-                <span className="hidden sm:inline">并把下一步缩小到今晚就能开始的一件事。</span>
-                <span className="sm:hidden">把下一步变成今晚就能开始的一件事。</span>
+                把卡住的事告诉 FutureLens。它会帮你拆开问题，
+                <span className="hidden sm:inline">准备能用的材料，并告诉你今天先做什么。</span>
+                <span className="sm:hidden">准备材料，并告诉你今天先做什么。</span>
               </p>
 
               <form
@@ -353,24 +365,24 @@ export default function HomePage() {
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#EEF3FF] text-[#5877CF]">
                     <Search className="h-4 w-4" />
                   </span>
-                  <span className="sr-only">说出你最近最纠结的一件事</span>
+                  <span className="sr-only">说出你现在卡住的一件事</span>
                   <input
                     value={concern}
                     onChange={(event) => setConcern(event.target.value)}
-                    placeholder="说出你最近最纠结的一件事"
-                    className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-[#172540] outline-none placeholder:text-[#929DB0]"
+                    placeholder="例如：我有一份材料，不知道怎么改"
+                    className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-[#172540] outline-none placeholder:text-slate-300"
                   />
                 </label>
                 <button
                   type="submit"
                   className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-md bg-[#3157D5] px-6 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(49,87,213,0.22)] transition-[background-color,transform] hover:bg-[#2748B8] active:translate-y-px sm:w-auto"
                 >
-                  开始分析我的下一步
+                  开始
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </form>
-              <p className="mt-2 text-xs text-[#929DB0]">
-                例如：我不知道该考研、就业，还是先学 AI。
+              <p className="mt-2 text-[11px] text-[#A8B1C0]">
+                也可以是：汇报、作品集、学习计划、工作流程
               </p>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-[#7B879B]">
@@ -383,12 +395,12 @@ export default function HomePage() {
                 </a>
                 <span className="h-3 w-px bg-[#CFD7E5]" />
                 <span className="text-[#7B879B]">
-                  从真实困惑开始 · 给出今晚行动 · 根据反馈持续更新
+                  从真实问题开始 · 给出今天先做什么 · 做完后继续调整
                 </span>
               </div>
             </div>
 
-            <div className="mt-12 sm:mt-14">
+            <div className="mt-16 sm:mt-20 lg:mt-22">
               <ProductPreview />
             </div>
           </div>
@@ -397,12 +409,12 @@ export default function HomePage() {
         <section id="capabilities" className="scroll-mt-20 bg-white pb-12 pt-16 sm:pb-14 sm:pt-20">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="mx-auto mb-10 max-w-2xl text-center">
-              <p className="mb-3 text-xs font-semibold text-[#3157D5]">FUTURELENS 如何帮助你</p>
+              <p className="mb-3 text-xs font-semibold text-[#3157D5]">FUTURELENS 能做什么</p>
               <h2 className="text-3xl font-semibold text-[#14213D] sm:text-4xl">
-                从理解问题，到获得真实反馈
+                把问题变成今天能做的事
               </h2>
               <p className="mt-4 text-sm leading-7 text-[#6E7C93] sm:text-base">
-                不提供一份看完就结束的报告，而是围绕当前最关键的未知持续更新判断。
+                不只给一段建议，而是帮你拆开问题、准备材料、开始第一步。
               </p>
             </div>
 
@@ -431,20 +443,20 @@ export default function HomePage() {
         <section id="how-it-works" className="scroll-mt-20 bg-[#F6F8FC] py-14 sm:py-16">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="mx-auto max-w-2xl text-center">
-              <p className="mb-3 text-xs font-semibold text-[#3157D5]">一条清晰的判断链路</p>
+              <p className="mb-3 text-xs font-semibold text-[#3157D5]">怎么使用</p>
               <h2 className="text-3xl font-semibold leading-tight text-[#14213D]">
-                从一句困惑，到一次真实更新
+                三步拿到下一步
               </h2>
               <p className="mt-5 text-sm leading-7 text-[#6E7C93]">
-                从最近最纠结的一件事开始，先识别真正问题，再用一个今晚可以完成的验证减少未知。
+                从一个真实问题开始，先拿到今天能做的事，再根据结果继续调整。
               </p>
             </div>
 
             <div className="mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:gap-0">
               {[
-                ['01', '输入你的处境', '说出你最近真正纠结的一件事。'],
-                ['02', '获得判断与行动', 'FutureLens 会生成真正问题、变化影响和今晚行动。'],
-                ['03', '根据结果持续更新', '记录你的行动结果，系统会继续修正对你的判断。'],
+                ['01', '说出你的问题', '把现在卡住的一件事写下来，不需要组织成完美描述。'],
+                ['02', '拿到材料和步骤', 'FutureLens 会准备可用材料，并告诉你今天先做什么。'],
+                ['03', '做完后继续调整', '记录实际结果，下一步会根据你的反馈继续变化。'],
               ].map(([number, label, description], index) => (
                 <div key={label} className="contents">
                   <div className="relative min-h-[184px] flex-1 rounded-lg border border-[#E0E7F3] bg-white p-6 shadow-[0_12px_30px_rgba(43,68,116,0.06)]">
@@ -464,6 +476,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
       </main>
 
       <footer className="border-t border-[#E7ECF5] bg-white py-7">
@@ -472,7 +485,7 @@ export default function HomePage() {
             <BrandMark compact />
             <span className="font-medium text-[#40506B]">FutureLens</span>
           </div>
-          <span>看清真正问题，找到下一步</span>
+          <span>说出你的问题，拿到下一步</span>
         </div>
       </footer>
     </div>

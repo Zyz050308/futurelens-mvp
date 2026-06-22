@@ -1,6 +1,9 @@
 export type UserRecord = {
   id: string;
+  publicUid: string | null;
+  nickname: string | null;
   email: string;
+  role: string;
   emailVerifiedAt: string | null;
   loginCodeHash: string | null;
   loginCodeExpiresAt: string | null;
@@ -13,7 +16,10 @@ export type UserRecord = {
 
 export type PublicUser = {
   id: string;
+  publicUid: string | null;
+  nickname: string | null;
   email: string;
+  role: string;
   emailVerifiedAt: string | null;
   lastLoginAt: string | null;
   createdAt: string;

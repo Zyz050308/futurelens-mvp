@@ -7,7 +7,6 @@ import { Sparkles, ArrowRight, Loader2, ChevronRight, User, Package, Target, Ale
 import { saveProfile, loadProfile } from '@/lib/radar';
 import { analyzeUserState } from '@/lib/stateEngine';
 import type { FutureProfile, UserStateProfile } from '@/types/radar';
-import FutureSelfAvatar from '@/components/FutureSelfAvatar';
 
 const EMPTY_PROFILE: FutureProfile = {
   age: '',
@@ -57,11 +56,11 @@ function getFilledFields(profile: FutureProfile): string[] {
   if (profile.majorOrCareer?.trim().length > 0) filled.push('职业背景');
   if (profile.age?.trim().length > 0) filled.push('年龄');
   if (profile.education?.trim().length > 0) filled.push('学历');
-  if (profile.currentSkills?.trim().length > 0) filled.push('当前能力');
-  if (profile.currentSituation?.trim().length > 0) filled.push('最近纠结的事');
+  if (profile.currentSkills?.trim().length > 0) filled.push('已有材料');
+  if (profile.currentSituation?.trim().length > 0) filled.push('你现在卡住的事');
   if (profile.desiredOutcome) filled.push('想获得什么');
-  if (profile.currentGoal?.trim().length > 0) filled.push('最想获得什么');
-  if (profile.currentAnxiety?.trim().length > 0) filled.push('最担心失去什么');
+  if (profile.currentGoal?.trim().length > 0) filled.push('补充说明');
+  if (profile.currentAnxiety?.trim().length > 0) filled.push('担心点');
   if (profile.weeklyTime) filled.push('每周时间');
   if (profile.riskPreference) filled.push('风险偏好');
   
@@ -72,10 +71,10 @@ function getMissingFields(profile: FutureProfile): string[] {
   const missing: string[] = [];
   
   if (!profile.majorOrCareer?.trim().length) missing.push('专业/职业');
-  if (!profile.currentSituation?.trim().length) missing.push('最近纠结的事');
+  if (!profile.currentSituation?.trim().length) missing.push('你现在卡住的事');
   if (!profile.desiredOutcome) missing.push('想获得什么');
-  if (!profile.currentGoal?.trim().length) missing.push('最想获得什么');
-  if (!profile.currentAnxiety?.trim().length) missing.push('最担心失去什么');
+  if (!profile.currentGoal?.trim().length) missing.push('补充说明');
+  if (!profile.currentAnxiety?.trim().length) missing.push('担心点');
   if (!profile.weeklyTime) missing.push('每周时间');
   if (!profile.riskPreference) missing.push('风险偏好');
   
@@ -110,32 +109,26 @@ function determineTimeConstraint(weeklyTime?: string): string {
 }
 
 // ============================================================
-// 右侧 Future Self 预览组件
+// 右侧问题理解预览组件
 // ============================================================
 
-interface FutureSelfPreviewProps {
+interface ProblemPreviewProps {
   profile: FutureProfile;
   userState: UserStateProfile | null;
 }
 
-function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
+function ProblemPreview({ profile, userState }: ProblemPreviewProps) {
   const filledFields = getFilledFields(profile);
   const missingFields = getMissingFields(profile);
   const hasEnoughInfo = filledFields.length >= 3;
-  
-  const identity = determineIdentity(profile);
   const mainGoal = determineMainGoal(profile);
-  const riskTendency = determineRiskTendency(profile.riskPreference);
-  const timeConstraint = determineTimeConstraint(profile.weeklyTime);
   
   // 影响判断的标签
   const influenceTags = [
-    { key: '最近纠结的事', label: '当前处境影响判断', filled: !!profile.currentSituation },
-    { key: '职业背景', label: '职业影响变化信号', filled: !!profile.majorOrCareer },
-    { key: '最想获得什么', label: '目标影响行动方向', filled: !!profile.currentGoal },
-    { key: '最担心失去什么', label: '焦虑影响优先级', filled: !!profile.currentAnxiety },
-    { key: '每周时间', label: '时间影响任务大小', filled: !!profile.weeklyTime },
-    { key: '风险偏好', label: '风险偏好影响路径', filled: !!profile.riskPreference },
+    { key: '当前问题', label: '你现在卡住的事', filled: !!profile.currentSituation },
+    { key: '目标', label: '你想得到什么', filled: !!profile.currentGoal || !!profile.desiredOutcome },
+    { key: '已有材料', label: '你已有的材料', filled: !!profile.currentSkills },
+    { key: '背景', label: '你的基本背景', filled: !!profile.majorOrCareer || !!profile.education || !!profile.age },
   ];
 
   if (!hasEnoughInfo) {
@@ -146,12 +139,12 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
             <Brain className="w-5 h-5 text-[#007AFF]" />
           </div>
           <div>
-            <h3 className="text-base font-semibold">Future Self 还没有成型</h3>
+            <h3 className="text-base font-semibold">等待你的问题</h3>
           </div>
         </div>
         
         <p className="text-sm text-[#6B7280] mb-6">
-          把你最近纠结的事情告诉 FutureLens，它会帮你找到真正的问题所在。
+          把你现在卡住的事告诉 FutureLens，它会先判断问题在哪里，再生成今天能做的下一步。
         </p>
         
         <div className="bg-[#F9FAFB] rounded-xl p-4">
@@ -159,15 +152,15 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <div className="w-1 h-1 rounded-full bg-[#FF9500]" />
-              <span>最近纠结的事</span>
+              <span>你现在卡住的事</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <div className="w-1 h-1 rounded-full bg-[#FF9500]" />
-              <span>最想获得什么</span>
+              <span>你想得到什么</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <div className="w-1 h-1 rounded-full bg-[#FF9500]" />
-              <span>最担心失去什么</span>
+              <span>你已有的材料</span>
             </div>
           </div>
         </div>
@@ -184,21 +177,23 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
             <Brain className="w-5 h-5 text-[#007AFF]" />
           </div>
           <div>
-            <h3 className="text-base font-semibold">Future Self 正在成型</h3>
-            <p className="text-xs text-[#6B7280]">每填写一项，系统都会重新理解你的处境</p>
+            <h3 className="text-base font-semibold">正在理解你的问题</h3>
+            <p className="text-xs text-[#6B7280]">你补充的信息会影响下一步建议</p>
           </div>
         </div>
 
         {/* 当前识别 */}
         <div className="bg-gradient-to-r from-[#007AFF]/10 to-[#AF52DE]/10 rounded-xl p-4 mb-4">
-          <div className="text-xs text-[#007AFF] font-semibold mb-3">当前识别</div>
+          <div className="text-xs text-[#007AFF] font-semibold mb-3">当前理解</div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#6B7280]">身份</span>
-              <span className="text-sm font-medium text-[#1D1D1F]">{identity}</span>
+              <span className="text-xs text-[#6B7280]">问题</span>
+              <span className="max-w-[220px] truncate text-sm font-medium text-[#1D1D1F]">
+                {profile.currentSituation || '待补充'}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#6B7280]">目标</span>
+              <span className="text-xs text-[#6B7280]">想得到</span>
               <span className="text-sm font-medium text-[#1D1D1F]">{mainGoal}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -212,7 +207,7 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
 
         {/* 这些信息正在影响判断 */}
         <div className="mb-4">
-          <div className="text-xs text-[#9CA3AF] font-medium mb-3">这些信息正在影响判断</div>
+          <div className="text-xs text-[#9CA3AF] font-medium mb-3">这些信息正在帮助理解</div>
           <div className="flex flex-wrap gap-2">
             {influenceTags.map((tag) => (
               <span
@@ -275,19 +270,6 @@ function FutureSelfPreview({ profile, userState }: FutureSelfPreviewProps) {
           </div>
         </div>
       )}
-
-      {/* Avatar */}
-      <div className="ios-card p-6 flex justify-center">
-        <FutureSelfAvatar
-          mode="full"
-          identity={identity}
-          futureRole={mainGoal !== '未识别' ? mainGoal : '寻找方向'}
-          stage=""
-          risk={riskTendency}
-          time={timeConstraint}
-          size="lg"
-        />
-      </div>
     </div>
   );
 }
@@ -545,7 +527,7 @@ export default function ProfilePage() {
             <ChevronRight className="w-5 h-5 rotate-180" />
             <span>返回</span>
           </Link>
-          <span className="text-base font-semibold">构建 Future Self</span>
+          <span className="text-base font-semibold">补充你的问题背景</span>
           <div className="w-16" />
         </div>
       </header>
@@ -555,33 +537,28 @@ export default function ProfilePage() {
           {/* 左侧表单 */}
           <div className="lg:col-span-7">
             
-            {/* 分组零：最近最让你纠结的一件事 */}
+            <div className="mb-7">
+              <h1 className="text-2xl font-semibold text-[#1D1D1F]">补充你的问题背景</h1>
+              <p className="mt-2 text-sm leading-6 text-[#6B7280]">
+                说清楚你现在卡住的事，FutureLens 会帮你判断下一步该做什么。
+              </p>
+            </div>
+
+            {/* 分组零：你现在卡住的事 */}
             <FormGroup
               icon={<MessageCircle className="w-5 h-5 text-[#FF3B30]" />}
-              title="最近最让你纠结的一件事是什么"
-              subtitle="这是系统理解你的最重要入口，优先填写这个"
+              title="你现在卡住的事是什么？"
+              subtitle="这是系统理解你的入口，先写这一项就可以开始。"
             >
-              <div className="p-4">
+              <div className="p-5">
                 <textarea
                   value={profile.currentSituation}
                   onChange={(e) => handleChange('currentSituation', e.target.value)}
-                  placeholder={`例如：
-我准备考雅思，
-每天学习很久，
-但成绩一直没有明显提高。
-
-或者：
-
-我学视觉传达，
-会设计也会拍视频，
-但不知道毕业后应该继续做设计还是转向AI。
-
-或者：
-
-我已经工作两年，
-但越来越担心自己的能力被AI替代。`}
-                  rows={6}
-                  className="w-full px-4 py-3 text-sm placeholder-[#9CA3AF] resize-none border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
+                  placeholder={`例如：我有一份简历，不知道怎么改。
+或者：我想准备作品集，但不知道项目介绍怎么写。
+或者：我每天都想学英语，但总是坚持不下去。`}
+                  rows={7}
+                  className="w-full px-4 py-4 text-base leading-7 placeholder-[#A8B1C0] resize-none border border-[#DDE4F0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
                 />
               </div>
             </FormGroup>
@@ -589,8 +566,8 @@ export default function ProfilePage() {
             {/* 分组一：你是谁 */}
             <FormGroup
               icon={<User className="w-5 h-5 text-[#007AFF]" />}
-              title="你是谁"
-              subtitle="这些信息决定系统理解你的现实身份"
+              title="你是谁？"
+              subtitle="简单补充背景就可以，不需要写得很完整。"
             >
               <FormRow label="年龄">
                 <input
@@ -621,28 +598,11 @@ export default function ProfilePage() {
               </FormRow>
             </FormGroup>
 
-            {/* 分组二：你有什么 */}
-            <FormGroup
-              icon={<Package className="w-5 h-5 text-[#34C759]" />}
-              title="你有什么"
-              subtitle="这些信息决定系统判断你能从哪里开始"
-            >
-              <FormRow label="当前能力" last>
-                <input
-                  type="text"
-                  value={profile.currentSkills}
-                  onChange={(e) => handleChange('currentSkills', e.target.value)}
-                  placeholder="如：Figma、Python、摄影"
-                  className={inputClass}
-                />
-              </FormRow>
-            </FormGroup>
-
-            {/* 分组三：你最想获得什么 */}
+            {/* 分组三：你想得到什么 */}
             <FormGroup
               icon={<Target className="w-5 h-5 text-[#AF52DE]" />}
-              title="你最想获得什么"
-              subtitle="这些信息决定系统优先帮你解决什么问题"
+              title="你想得到什么？"
+              subtitle="告诉 FutureLens 你希望这次问题被推进到哪里。"
             >
               <FormRow label="想获得什么">
                 <select
@@ -660,28 +620,45 @@ export default function ProfilePage() {
                   <option value="留学">留学</option>
                 </select>
               </FormRow>
-              <FormRow label="你最想获得什么" last>
+              <FormRow label="补充说明" last>
                 <textarea
                   value={profile.currentGoal}
                   onChange={(e) => handleChange('currentGoal', e.target.value)}
-                  placeholder="如：通过雅思、找到工作、增加收入"
+                  placeholder="例如：找到工作、改好材料、提高效率、准备考试"
                   rows={2}
                   className={textareaClass}
                 />
               </FormRow>
             </FormGroup>
 
-            {/* 分组四：你最担心失去什么 */}
+            {/* 分组四：你有什么材料 */}
+            <FormGroup
+              icon={<Package className="w-5 h-5 text-[#34C759]" />}
+              title="你有什么材料？"
+              subtitle="如果你已经有简历、作品集介绍、汇报稿、学习计划，可以先简单说明。"
+            >
+              <FormRow label="已有材料" last>
+                <textarea
+                  value={profile.currentSkills}
+                  onChange={(e) => handleChange('currentSkills', e.target.value)}
+                  placeholder="例如：我有一份简历，但还没整理好项目经历。"
+                  rows={2}
+                  className={textareaClass}
+                />
+              </FormRow>
+            </FormGroup>
+
+            {/* 更多背景 */}
             <FormGroup
               icon={<AlertTriangle className="w-5 h-5 text-[#FF9500]" />}
-              title="你最担心失去什么"
-              subtitle="这些信息决定系统给你多激进、多现实的行动建议"
+              title="更多背景"
+              subtitle="可选填写。它们会帮助系统判断任务大小和推进方式。"
             >
-              <FormRow label="你最担心失去什么">
+              <FormRow label="担心点">
                 <textarea
                   value={profile.currentAnxiety}
                   onChange={(e) => handleChange('currentAnxiety', e.target.value)}
-                  placeholder="如：错过申请时间、毕业失业、被AI替代"
+                  placeholder="如：错过申请时间、毕业失业、材料一直改不好"
                   rows={2}
                   className={textareaClass}
                 />
@@ -725,12 +702,12 @@ export default function ProfilePage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    让 FutureLens 分析我的下一步...
+                    正在生成我的下一步...
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5" />
-                    生成我的机会雷达
+                    生成我的下一步
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
@@ -746,7 +723,7 @@ export default function ProfilePage() {
                 </p>
               )}
               <p className="text-xs text-[#9CA3AF] text-center mt-3">
-                填写越完整，分析越精准
+                填写越完整，下一步越准确。
               </p>
             </div>
           </div>
@@ -754,7 +731,7 @@ export default function ProfilePage() {
           {/* 右侧预览 */}
           <div className="lg:col-span-5">
             <div className="sticky top-24">
-              <FutureSelfPreview profile={profile} userState={userState} />
+              <ProblemPreview profile={profile} userState={userState} />
             </div>
           </div>
         </div>

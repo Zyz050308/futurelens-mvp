@@ -3,8 +3,8 @@ import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FutureLens - AI时代的个人未来影响系统",
-  description: "今天有哪些AI事件正在改变你的未来？",
+  title: "FutureLens｜未来透镜",
+  description: "说出你的问题，拿到下一步。",
 };
 
 export default function RootLayout({
