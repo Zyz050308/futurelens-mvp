@@ -208,15 +208,13 @@ export default function AccountPage() {
   }
 
   const { user, profile, latestProblem, problems } = account;
+  const currentDirection = profile?.currentGoal || profile?.desiredOutcome;
 
   return (
     <main className="min-h-screen bg-[#F6F8FC] text-[#14213D]">
       <header className="border-b border-[#E4EAF4] bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#3157D5]"
-          >
+          <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#3157D5]">
             <Home className="h-4 w-4" />
             返回首页
           </Link>
@@ -288,16 +286,21 @@ export default function AccountPage() {
           )}
         </section>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <section className="rounded-2xl border border-[#E0E7F3] bg-white p-6 shadow-[0_12px_30px_rgba(43,68,116,0.06)]">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF3FF] text-[#3157D5]">
-                <UserRound className="h-5 w-5" />
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF3FF] text-[#3157D5]">
+                  <UserRound className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-[#172540]">我的 FutureLens 身份</h2>
+                  <p className="text-xs text-[#8A96A9]">公开 UID 只是身份编号，不是安全主键</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-semibold text-[#172540]">我的身份</h2>
-                <p className="text-xs text-[#8A96A9]">公开身份编号</p>
-              </div>
+              <Link href="/register?mode=complete-profile" className="text-sm font-semibold text-[#3157D5] hover:text-[#2748B8]">
+                完善身份
+              </Link>
             </div>
             <dl className="space-y-4 text-sm">
               <div className="flex items-center justify-between gap-4">
@@ -309,6 +312,18 @@ export default function AccountPage() {
                 <dd className="font-mono text-lg font-bold tracking-[0.08em] text-[#3157D5]">
                   {displayValue(user.publicUid)}
                 </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-[#7A879C]">专业 / 职业</dt>
+                <dd className="text-right font-medium text-[#172540]">{displayValue(profile?.majorOrCareer)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-[#7A879C]">当前方向</dt>
+                <dd className="text-right font-medium text-[#172540]">{displayValue(currentDirection)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-[#7A879C]">阶段 / 年龄</dt>
+                <dd className="text-right font-medium text-[#172540]">{displayValue(profile?.age)}</dd>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <dt className="pt-1 text-[#7A879C]">状态</dt>
@@ -325,30 +340,23 @@ export default function AccountPage() {
           </section>
 
           <section className="rounded-2xl border border-[#E0E7F3] bg-white p-6 shadow-[0_12px_30px_rgba(43,68,116,0.06)]">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EAF7EF] text-[#247A47]">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-[#172540]">我的背景</h2>
-                  <p className="text-xs text-[#8A96A9]">用于理解你的问题处境</p>
-                </div>
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EAF7EF] text-[#247A47]">
+                <FileText className="h-5 w-5" />
               </div>
-              <Link href="/profile" className="text-sm font-semibold text-[#3157D5] hover:text-[#2748B8]">
-                补充背景
-              </Link>
+              <div>
+                <h2 className="font-semibold text-[#172540]">问题背景</h2>
+                <p className="text-xs text-[#8A96A9]">用于理解你最近正在推进的事</p>
+              </div>
             </div>
             <div className="grid gap-4 text-sm sm:grid-cols-3">
               <div className="rounded-xl bg-[#F7F9FD] p-4">
-                <p className="text-xs text-[#8A96A9]">专业 / 职业</p>
-                <p className="mt-2 font-medium text-[#172540]">{displayValue(profile?.majorOrCareer)}</p>
+                <p className="text-xs text-[#8A96A9]">当前问题</p>
+                <p className="mt-2 font-medium text-[#172540]">{displayValue(profile?.currentSituation)}</p>
               </div>
               <div className="rounded-xl bg-[#F7F9FD] p-4">
-                <p className="text-xs text-[#8A96A9]">当前目标</p>
-                <p className="mt-2 font-medium text-[#172540]">
-                  {displayValue(profile?.currentGoal || profile?.desiredOutcome)}
-                </p>
+                <p className="text-xs text-[#8A96A9]">已有材料</p>
+                <p className="mt-2 font-medium text-[#172540]">{displayValue(profile?.currentSkills)}</p>
               </div>
               <div className="rounded-xl bg-[#F7F9FD] p-4">
                 <p className="text-xs text-[#8A96A9]">常见卡点</p>

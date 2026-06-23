@@ -21,12 +21,17 @@ function RegisterContent() {
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [ageStage, setAgeStage] = useState('');
+  const [profession, setProfession] = useState('');
+  const [currentDirection, setCurrentDirection] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
   const [codeRequested, setCodeRequested] = useState(false);
   const [isRequestingCode, setIsRequestingCode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [registeredUser, setRegisteredUser] = useState<PublicUser | null>(null);
+
+  const loginHref = `/login?from=${encodeURIComponent(from)}`;
 
   const handleRequestCode = async () => {
     if (isRequestingCode) {
@@ -87,6 +92,9 @@ function RegisterContent() {
           nickname,
           email,
           verificationCode,
+          ageStage,
+          profession,
+          currentDirection,
         }),
       });
       const result = await response.json().catch(() => null);
@@ -107,17 +115,49 @@ function RegisterContent() {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F7FF_54%,#FFFFFF_100%)] px-5 py-10 text-[#14213D]">
         <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-xl items-center">
-          <section className="w-full rounded-2xl border border-[#E0E7F3] bg-white p-8 shadow-[0_24px_70px_rgba(43,68,116,0.12)]">
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-[#EAF7EF] text-[#247A47]">
+          <section className="w-full rounded-3xl border border-[#E0E7F3] bg-white p-8 shadow-[0_24px_70px_rgba(43,68,116,0.12)]">
+            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EAF7EF] text-[#247A47]">
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <p className="text-sm font-semibold text-[#3157D5]">欢迎来到 FutureLens</p>
-            <h1 className="mt-3 text-3xl font-bold text-[#101D38]">
-              你的 UID：{registeredUser.publicUid || '生成中'}
-            </h1>
+            <h1 className="mt-3 text-3xl font-bold text-[#101D38]">你的 UID：{registeredUser.publicUid || '生成中'}</h1>
             <p className="mt-4 text-sm leading-7 text-[#66758E]">
               从现在开始，FutureLens 会把你的问题、反馈和材料记录在这个身份下。
             </p>
+
+            <div className="mt-6 rounded-2xl border border-[#E3EAF6] bg-[#F8FAFF] p-5">
+              <p className="text-sm font-semibold text-[#101D38]">你的 FutureLens 身份卡</p>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#7A879C]">昵称</dt>
+                  <dd className="font-medium text-[#172540]">{registeredUser.nickname || '还没补充'}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#7A879C]">UID</dt>
+                  <dd className="font-mono font-bold tracking-[0.08em] text-[#3157D5]">
+                    {registeredUser.publicUid || '生成中'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#7A879C]">专业 / 职业</dt>
+                  <dd className="text-right font-medium text-[#172540]">{profession.trim() || '还没补充'}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#7A879C]">当前方向</dt>
+                  <dd className="text-right font-medium text-[#172540]">{currentDirection.trim() || '还没补充'}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#7A879C]">身份状态</dt>
+                  <dd className="rounded-full bg-[#EAF7EF] px-3 py-1 text-xs font-semibold text-[#247A47]">
+                    内测用户
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-4 text-xs leading-6 text-[#66758E]">
+                FutureLens 会根据你的身份和问题，持续记录你卡在哪里，并生成下一步。
+              </p>
+            </div>
+
             <button
               type="button"
               onClick={() => router.push(from)}
@@ -135,13 +175,13 @@ function RegisterContent() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F7FF_54%,#FFFFFF_100%)] px-5 py-10 text-[#14213D]">
       <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-xl items-center">
-        <section className="w-full rounded-2xl border border-[#E0E7F3] bg-white p-8 shadow-[0_24px_70px_rgba(43,68,116,0.12)]">
+        <section className="w-full rounded-3xl border border-[#E0E7F3] bg-white p-8 shadow-[0_24px_70px_rgba(43,68,116,0.12)]">
           <Link href="/" className="text-sm font-medium text-[#3157D5] hover:text-[#2748B8]">
             返回首页
           </Link>
 
           <div className="mt-8">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#EEF3FF] text-[#3157D5]">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF3FF] text-[#3157D5]">
               <Sparkles className="h-6 w-6" />
             </div>
             <h1 className="text-3xl font-bold text-[#101D38]">创建你的 FutureLens 身份</h1>
@@ -157,9 +197,41 @@ function RegisterContent() {
                 value={nickname}
                 onChange={(event) => setNickname(event.target.value)}
                 placeholder="例如：阿盘"
-                className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
+                className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition placeholder:text-[#A8B1C0] focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
               />
             </label>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="block">
+                <span className="text-sm font-medium text-[#33425D]">年龄 / 阶段</span>
+                <input
+                  value={ageStage}
+                  onChange={(event) => setAgeStage(event.target.value)}
+                  placeholder="例如 20 / 大学生"
+                  className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition placeholder:text-[#A8B1C0] focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-[#33425D]">专业 / 职业</span>
+                <input
+                  value={profession}
+                  onChange={(event) => setProfession(event.target.value)}
+                  placeholder="例如 视觉传达设计"
+                  className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition placeholder:text-[#A8B1C0] focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-[#33425D]">当前方向</span>
+                <input
+                  value={currentDirection}
+                  onChange={(event) => setCurrentDirection(event.target.value)}
+                  placeholder="例如 作品集、找工作"
+                  className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition placeholder:text-[#A8B1C0] focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
+                />
+              </label>
+            </div>
 
             <label className="block">
               <span className="text-sm font-medium text-[#33425D]">邮箱</span>
@@ -169,7 +241,7 @@ function RegisterContent() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="h-12 min-w-0 flex-1 rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
+                  className="h-12 min-w-0 flex-1 rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition placeholder:text-[#A8B1C0] focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
                 />
                 <button
                   type="button"
@@ -191,7 +263,7 @@ function RegisterContent() {
                   value={verificationCode}
                   onChange={(event) => setVerificationCode(event.target.value)}
                   placeholder="输入 6 位验证码"
-                  className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
+                  className="mt-2 h-12 w-full rounded-xl border border-[#DDE4F0] bg-white px-4 text-sm outline-none transition placeholder:text-[#A8B1C0] focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/10"
                 />
               </label>
             )}
@@ -207,9 +279,14 @@ function RegisterContent() {
             )}
 
             {error && (
-              <p className="rounded-xl bg-[#FFF1F0] px-4 py-3 text-sm text-[#C24135]">
-                {error}
-              </p>
+              <div className="rounded-xl bg-[#FFF1F0] px-4 py-3 text-sm text-[#C24135]">
+                <p>{error}</p>
+                {error.includes('已创建') && (
+                  <Link href={loginHref} className="mt-2 inline-block font-semibold text-[#3157D5]">
+                    去登录
+                  </Link>
+                )}
+              </div>
             )}
 
             <button
@@ -232,8 +309,8 @@ function RegisterContent() {
           </form>
 
           <p className="mt-5 text-center text-xs text-[#8B97AA]">
-            已有账号？{' '}
-            <Link href={`/login?from=${encodeURIComponent(from)}`} className="font-medium text-[#3157D5]">
+            已有身份？{' '}
+            <Link href={loginHref} className="font-medium text-[#3157D5]">
               去登录
             </Link>
           </p>

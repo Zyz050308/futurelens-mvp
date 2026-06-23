@@ -11,7 +11,9 @@ import {
   publicUidExists,
   updateUserAccountIdentity,
 } from '@/lib/repositories/users';
+import { getProfileByUserId, upsertProfile } from '@/lib/repositories/profiles';
 import { generatePublicUid } from '@/lib/uid';
+import type { FutureProfile } from '@/types/radar';
 
 function isSmtpConfigured(): boolean {
   return [
@@ -34,6 +36,9 @@ export async function POST(request: NextRequest) {
     const nickname = String(body.nickname || '').trim();
     const email = normalizeEmail(String(body.email || ''));
     const verificationCode = String(body.verificationCode || '').trim();
+    const ageStage = String(body.ageStage || '').trim();
+    const profession = String(body.profession || '').trim();
+    const currentDirection = String(body.currentDirection || '').trim();
 
     if (!nickname || nickname.length > 32) {
       return NextResponse.json(
@@ -110,6 +115,24 @@ export async function POST(request: NextRequest) {
     const userWithIdentity = identityPatch.publicUid || identityPatch.nickname
       ? await updateUserAccountIdentity(verifiedUser.id, identityPatch)
       : verifiedUser;
+
+    if (ageStage || profession || currentDirection) {
+      const existingProfile = await getProfileByUserId(userWithIdentity.id);
+      const profilePatch: FutureProfile = {
+        age: ageStage || existingProfile?.profile.age || '',
+        education: existingProfile?.profile.education || '',
+        majorOrCareer: profession || existingProfile?.profile.majorOrCareer || '',
+        currentSkills: existingProfile?.profile.currentSkills || '',
+        currentSituation: existingProfile?.profile.currentSituation || '',
+        currentGoal: currentDirection || existingProfile?.profile.currentGoal || '',
+        currentAnxiety: existingProfile?.profile.currentAnxiety || '',
+        desiredOutcome: existingProfile?.profile.desiredOutcome || '',
+        weeklyTime: existingProfile?.profile.weeklyTime || '',
+        riskPreference: existingProfile?.profile.riskPreference || '',
+      };
+
+      await upsertProfile(userWithIdentity.id, profilePatch);
+    }
 
     const publicUser = await issueSessionForUser(userWithIdentity, {
       secureCookie: isSecureRequest(request),
