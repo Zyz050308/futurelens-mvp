@@ -7,7 +7,9 @@ import {
   ArrowRight,
   Clock3,
   FileText,
+  Home,
   Loader2,
+  LogOut,
   Sparkles,
   UserRound,
 } from 'lucide-react';
@@ -54,6 +56,7 @@ export default function AccountPage() {
   const [newProblem, setNewProblem] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,6 +106,22 @@ export default function AccountPage() {
     };
   }, [router]);
 
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      router.replace('/');
+    }
+  };
+
   const handleStartProblem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const problem = newProblem.trim();
@@ -123,7 +142,7 @@ export default function AccountPage() {
         body: JSON.stringify({ problem }),
       });
     } catch {
-      // The draft still moves forward locally if the lightweight account log is unavailable.
+      // The local draft keeps the existing Radar flow usable if the account log is unavailable.
     }
 
     let existingDraft: Partial<FutureProfile> = {};
@@ -175,13 +194,28 @@ export default function AccountPage() {
   return (
     <main className="min-h-screen bg-[#F6F8FC] text-[#14213D]">
       <header className="border-b border-[#E4EAF4] bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="text-sm font-semibold text-[#3157D5]">
-            FutureLens
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#3157D5]"
+          >
+            <Home className="h-4 w-4" />
+            返回首页
           </Link>
-          <Link href="/profile" className="text-sm font-medium text-[#66758E] hover:text-[#3157D5]">
-            补充问题背景
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/profile" className="text-sm font-medium text-[#66758E] hover:text-[#3157D5]">
+              补充问题背景
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#DDE4F0] bg-white px-3 text-sm font-medium text-[#66758E] transition-colors hover:border-[#C9D5E8] hover:text-[#1D1D1F] disabled:opacity-60"
+            >
+              {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+              退出登录
+            </button>
+          </div>
         </div>
       </header>
 
@@ -218,8 +252,13 @@ export default function AccountPage() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-[#7A879C]">当前状态</dt>
-                <dd className="rounded-full bg-[#EAF7EF] px-3 py-1 text-xs font-semibold text-[#247A47]">
-                  {user.role === 'admin' ? '管理员' : '早期用户'}
+                <dd className="text-right">
+                  <span className="rounded-full bg-[#EAF7EF] px-3 py-1 text-xs font-semibold text-[#247A47]">
+                    {user.role === 'admin' ? '管理员' : '内测用户'}
+                  </span>
+                  {user.role !== 'admin' && (
+                    <p className="mt-2 text-xs text-[#8A96A9]">参与 FutureLens 早期测试的账号。</p>
+                  )}
                 </dd>
               </div>
             </dl>
@@ -289,14 +328,14 @@ export default function AccountPage() {
                 ))
               ) : (
                 <p className="rounded-xl bg-[#F7F9FD] p-4 text-sm text-[#8A96A9]">
-                  你的历史问题会出现在这里。
+                  你开始过的问题会出现在这里。
                 </p>
               )}
             </div>
           </section>
         </div>
 
-        <section className="mt-5 rounded-2xl border border-[#D7E2F4] bg-[linear-gradient(145deg,#FFFFFF_0%,#F4F7FF_100%)] p-6 shadow-[0_18px_46px_rgba(43,68,116,0.09)]">
+        <section className="mt-5 rounded-2xl border border-[#D7E2F4] bg-white p-6 shadow-[0_18px_46px_rgba(43,68,116,0.08)]">
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF3FF] text-[#3157D5]">
               <Sparkles className="h-5 w-5" />

@@ -42,13 +42,13 @@ function RegisterContent() {
         throw new Error('请先填写昵称');
       }
 
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ nickname, email }),
       });
       const result = await response.json().catch(() => null);
 

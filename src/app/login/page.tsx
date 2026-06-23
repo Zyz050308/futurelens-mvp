@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Check, Copy, Loader2, Mail } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Loader2, Mail, UserPlus } from 'lucide-react';
 
 type LoginStep = 'email' | 'code';
 
@@ -14,6 +14,7 @@ type LoginResponse = {
   expiresAt?: string;
   devCode?: string;
   delivery?: 'email' | 'development';
+  code?: string;
   error?: string;
 };
 
@@ -30,6 +31,10 @@ function getReturnPath(): string {
   return candidate;
 }
 
+function getRegisterPath(): string {
+  return `/register?from=${encodeURIComponent(getReturnPath())}`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<LoginStep>('email');
@@ -41,6 +46,7 @@ export default function LoginPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [shouldCreateIdentity, setShouldCreateIdentity] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,7 +65,7 @@ export default function LoginPage() {
           return;
         }
       } catch {
-        // The login form remains available when session lookup fails.
+        // Keep the login form usable when session lookup fails.
       }
 
       if (isMounted) {
@@ -77,6 +83,7 @@ export default function LoginPage() {
   const requestCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    setShouldCreateIdentity(false);
     setIsSubmitting(true);
 
     try {
@@ -91,6 +98,9 @@ export default function LoginPage() {
       const result = await response.json() as LoginResponse;
 
       if (!response.ok || !result.success) {
+        if (result.code === 'USER_NOT_FOUND' || result.code === 'INCOMPLETE_ACCOUNT') {
+          setShouldCreateIdentity(true);
+        }
         throw new Error(result.error || '验证码发送失败');
       }
 
@@ -161,32 +171,32 @@ export default function LoginPage() {
 
   if (isCheckingSession) {
     return (
-      <main className="min-h-screen bg-[#F5F5F7] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#007AFF] animate-spin" aria-label="正在检查登录状态" />
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F5F7]">
+        <Loader2 className="h-6 w-6 animate-spin text-[#007AFF]" aria-label="正在检查登录状态" />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F5F7] px-5 py-12 flex items-center justify-center">
+    <main className="flex min-h-screen items-center justify-center bg-[#F5F5F7] px-5 py-12">
       <div className="w-full max-w-sm">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#1D1D1F] mb-6"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#1D1D1F]"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="h-4 w-4" />
           返回
         </Link>
 
         <section className="ios-card p-6">
-          <div className="w-10 h-10 rounded-xl bg-[#007AFF]/10 flex items-center justify-center mb-5">
-            <Mail className="w-5 h-5 text-[#007AFF]" />
+          <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#007AFF]/10">
+            <Mail className="h-5 w-5 text-[#007AFF]" />
           </div>
 
           <h1 className="text-xl font-semibold text-[#1D1D1F]">
             {step === 'email' ? '登录 FutureLens' : '输入验证码'}
           </h1>
-          <p className="mt-2 text-sm text-[#6B7280] leading-relaxed">
+          <p className="mt-2 text-sm leading-relaxed text-[#6B7280]">
             {step === 'email'
               ? '登录后，你的 Profile 和发现记录可以跨设备恢复。'
               : delivery === 'development'
@@ -196,7 +206,7 @@ export default function LoginPage() {
 
           {step === 'email' ? (
             <form onSubmit={requestCode} className="mt-6">
-              <label htmlFor="email" className="block text-sm font-medium text-[#1D1D1F] mb-2">
+              <label htmlFor="email" className="mb-2 block text-sm font-medium text-[#1D1D1F]">
                 邮箱
               </label>
               <input
@@ -213,18 +223,28 @@ export default function LoginPage() {
 
               {error && <p className="mt-3 text-sm text-[#FF3B30]">{error}</p>}
 
+              {shouldCreateIdentity && (
+                <Link
+                  href={getRegisterPath()}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#CBD6EA] bg-white px-4 py-3 text-sm font-semibold text-[#3157D5] transition-colors hover:bg-[#F4F7FF]"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  创建 FutureLens 身份
+                </Link>
+              )}
+
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="ios-button-primary w-full mt-5 flex items-center justify-center gap-2 disabled:opacity-50"
+                className="ios-button-primary mt-5 flex w-full items-center justify-center gap-2 disabled:opacity-50"
               >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 获取验证码
               </button>
             </form>
           ) : (
             <form onSubmit={verifyCode} className="mt-6">
-              <label htmlFor="code" className="block text-sm font-medium text-[#1D1D1F] mb-2">
+              <label htmlFor="code" className="mb-2 block text-sm font-medium text-[#1D1D1F]">
                 验证码
               </label>
               <input
@@ -245,18 +265,18 @@ export default function LoginPage() {
               {devCode && (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-[#FFF7E8] px-3 py-2 text-sm text-[#9A6700]">
                   <span>
-                    开发验证码：<span className="font-semibold select-all">{devCode}</span>
+                    开发验证码：<span className="select-all font-semibold">{devCode}</span>
                   </span>
                   <button
                     type="button"
                     onClick={copyDevCode}
                     aria-label="复制开发验证码"
                     title="复制开发验证码"
-                    className="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-[#9A6700]/10"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-[#9A6700]/10"
                   >
                     {isCopied
-                      ? <Check className="w-4 h-4" />
-                      : <Copy className="w-4 h-4" />}
+                      ? <Check className="h-4 w-4" />
+                      : <Copy className="h-4 w-4" />}
                   </button>
                 </div>
               )}
@@ -266,9 +286,9 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || code.length !== 6}
-                className="ios-button-primary w-full mt-5 flex items-center justify-center gap-2 disabled:opacity-50"
+                className="ios-button-primary mt-5 flex w-full items-center justify-center gap-2 disabled:opacity-50"
               >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 完成登录
               </button>
 
@@ -281,9 +301,10 @@ export default function LoginPage() {
                   setDevCode('');
                   setDelivery('email');
                   setIsCopied(false);
+                  setShouldCreateIdentity(false);
                   setError('');
                 }}
-                className="w-full mt-3 py-2 text-sm text-[#007AFF] disabled:opacity-50"
+                className="mt-3 w-full py-2 text-sm text-[#007AFF] disabled:opacity-50"
               >
                 更换邮箱
               </button>

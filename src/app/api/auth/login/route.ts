@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!code) {
-      const result = await issueLoginCode(email);
+      const result = await issueLoginCode(email, {
+        createIfMissing: false,
+      });
       const smtpConfigured = isSmtpConfigured();
 
       return NextResponse.json({
@@ -54,6 +56,28 @@ export async function POST(request: NextRequest) {
       user,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'USER_NOT_FOUND') {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'USER_NOT_FOUND',
+          error: '这个邮箱还没有 FutureLens 身份，请先创建身份。',
+        },
+        { status: 404 }
+      );
+    }
+
+    if (error instanceof Error && error.message === 'INCOMPLETE_ACCOUNT') {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'INCOMPLETE_ACCOUNT',
+          error: '这个邮箱还没有完成 FutureLens 身份创建，请先创建身份。',
+        },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

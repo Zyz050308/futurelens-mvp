@@ -46,6 +46,10 @@ function toPublicUser(user: UserRecord): PublicUser {
   };
 }
 
+function hasCompleteAccountIdentity(user: UserRecord): boolean {
+  return Boolean(user.publicUid && user.nickname);
+}
+
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -54,7 +58,12 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-export async function issueLoginCode(emailInput: string) {
+export async function issueLoginCode(
+  emailInput: string,
+  options: {
+    createIfMissing?: boolean;
+  } = {}
+) {
   const email = normalizeEmail(emailInput);
   if (!isValidEmail(email)) {
     throw new Error('Invalid email');
@@ -62,10 +71,18 @@ export async function issueLoginCode(emailInput: string) {
 
   let user = await findUserByEmail(email);
   if (!user) {
+    if (options.createIfMissing === false) {
+      throw new Error('USER_NOT_FOUND');
+    }
+
     user = await createUser({
       id: randomUUID(),
       email,
     });
+  }
+
+  if (options.createIfMissing === false && !hasCompleteAccountIdentity(user)) {
+    throw new Error('INCOMPLETE_ACCOUNT');
   }
 
   const code = `${randomInt(100000, 1000000)}`;
@@ -93,6 +110,9 @@ export async function verifyLoginCode(
   options: VerifyLoginCodeOptions = {}
 ) {
   const user = await getUserForValidLoginCode(emailInput, code);
+  if (!hasCompleteAccountIdentity(user)) {
+    throw new Error('INCOMPLETE_ACCOUNT');
+  }
   return issueSessionForUser(user, options);
 }
 
