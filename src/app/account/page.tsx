@@ -209,6 +209,7 @@ export default function AccountPage() {
 
   const { user, profile, latestProblem, problems } = account;
   const currentDirection = profile?.currentGoal || profile?.desiredOutcome;
+  const activeProblem = latestProblem?.originalInput || profile?.currentSituation?.trim() || '';
 
   return (
     <main className="min-h-screen bg-[#F6F8FC] text-[#14213D]">
@@ -248,15 +249,15 @@ export default function AccountPage() {
             <Clock3 className="h-5 w-5 text-[#8A96A9]" />
           </div>
 
-          {latestProblem ? (
+          {activeProblem ? (
             <>
               <p className="rounded-2xl bg-[#F7F9FD] p-5 text-base font-medium leading-8 text-[#24334F]">
-                {latestProblem.originalInput}
+                {activeProblem}
               </p>
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => continueProblem(latestProblem.originalInput)}
+                  onClick={() => continueProblem(activeProblem)}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#3157D5] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#2748B8]"
                 >
                   继续生成下一步
@@ -264,7 +265,7 @@ export default function AccountPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => continueProblem(latestProblem.originalInput)}
+                  onClick={() => continueProblem(activeProblem)}
                   className="inline-flex h-11 items-center justify-center rounded-xl border border-[#DDE4F0] bg-white px-5 text-sm font-semibold text-[#3157D5] transition-colors hover:bg-[#F4F7FF]"
                 >
                   补充问题背景

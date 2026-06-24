@@ -367,6 +367,31 @@ export default function ProfilePage() {
       }
 
       saveProfile(result.profile);
+
+      const currentProblem = result.profile.currentSituation?.trim();
+      if (currentProblem) {
+        try {
+          const accountResponse = await fetch('/api/account', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ problem: currentProblem }),
+          });
+          const accountResult = await accountResponse.json().catch(() => null);
+
+          if (!accountResponse.ok || !accountResult?.success) {
+            console.warn(
+              '[Profile] Failed to sync current problem:',
+              accountResult?.error || accountResponse.statusText
+            );
+          }
+        } catch (syncError) {
+          console.warn('[Profile] Failed to sync current problem:', syncError);
+        }
+      }
+
       localStorage.removeItem(PROFILE_DRAFT_KEY);
       localStorage.removeItem('futurelens-latest-radar');
       localStorage.removeItem('futurelens-latest-radar-created-at');

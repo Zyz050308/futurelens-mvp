@@ -76,6 +76,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const existingLatestProblem = await getLatestUserProblem(user.id);
+    if (existingLatestProblem?.originalInput.trim() === problem) {
+      return NextResponse.json({
+        success: true,
+        latestProblem: existingLatestProblem,
+        deduplicated: true,
+      });
+    }
+
     const latestProblem = await createUserProblem({
       userId: user.id,
       originalInput: problem,
