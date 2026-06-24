@@ -13,6 +13,18 @@ function getSafeFrom(value: string | null): string {
   return value;
 }
 
+function getIdentityPortrait(profession: string, currentDirection: string): string {
+  if (/视觉|设计/.test(profession)) {
+    return '设计学习者';
+  }
+
+  if (/AI/i.test(currentDirection)) {
+    return 'AI 提效探索中';
+  }
+
+  return '问题推进者';
+}
+
 function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -112,6 +124,8 @@ function RegisterContent() {
   };
 
   if (registeredUser) {
+    const identityPortrait = getIdentityPortrait(profession, currentDirection);
+
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F7FF_54%,#FFFFFF_100%)] px-5 py-10 text-[#14213D]">
         <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-xl items-center">
@@ -151,6 +165,10 @@ function RegisterContent() {
                   <dd className="rounded-full bg-[#EAF7EF] px-3 py-1 text-xs font-semibold text-[#247A47]">
                     内测用户
                   </dd>
+                </div>
+                <div className="flex justify-between gap-4 border-t border-[#E3EAF6] pt-3">
+                  <dt className="text-[#7A879C]">身份画像</dt>
+                  <dd className="font-medium text-[#3157D5]">{identityPortrait}</dd>
                 </div>
               </dl>
               <p className="mt-4 text-xs leading-6 text-[#66758E]">

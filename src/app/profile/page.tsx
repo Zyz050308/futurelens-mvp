@@ -211,7 +211,9 @@ function ProblemPreview({ profile, userState, isSubmitting, onGenerate }: Proble
       {userState && (
         <div className="mt-5 rounded-2xl border border-[#E8EEF7] bg-[#FBFCFF] p-4">
           <p className="text-xs font-semibold text-[#007AFF]">当前理解</p>
-          <p className="mt-2 text-sm leading-6 text-[#4B5563]">{userState.oneSentenceDiagnosis}</p>
+          <p className="mt-2 text-sm leading-6 text-[#4B5563]">
+            {hasCurrentProblem ? '已经可以生成。补充越多，下一步会越具体。' : '先写下你现在卡住的事。'}
+          </p>
         </div>
       )}
 

@@ -359,10 +359,8 @@ export default function AccountPage() {
                 <p className="mt-2 font-medium text-[#172540]">{displayValue(profile?.currentSkills)}</p>
               </div>
               <div className="rounded-xl bg-[#F7F9FD] p-4">
-                <p className="text-xs text-[#8A96A9]">常见卡点</p>
-                <p className="mt-2 font-medium text-[#172540]">
-                  {displayValue(profile?.currentAnxiety || profile?.currentSituation)}
-                </p>
+                <p className="text-xs text-[#8A96A9]">补充背景</p>
+                <p className="mt-2 font-medium text-[#172540]">{displayValue(profile?.currentAnxiety)}</p>
               </div>
             </div>
           </section>
