@@ -6,8 +6,9 @@ import { Sparkles, ChevronRight, Loader2, RefreshCw, AlertCircle, Zap, TrendingU
 import { loadProfile } from '@/lib/radar';
 import { getChangeSignalsForProfile, generateProfileHash } from '@/lib/changeEngine';
 import { analyzeUserState } from '@/lib/stateEngine';
+import { buildSolutionResult } from '@/lib/solutionEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
-import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
+import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
 
 type VerificationPhase = 'idle' | 'started' | 'recording' | 'recorded';
@@ -1003,6 +1004,157 @@ function SolutionPackPreviewCard({
   );
 }
 
+function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
+  const [refinementText, setRefinementText] = useState('');
+  const [refinementNote, setRefinementNote] = useState<string | null>(null);
+
+  const handleRefine = () => {
+    const value = refinementText.trim();
+    if (!value) return;
+    console.log('[Solution Workspace] refinement input:', value);
+    setRefinementNote('已记录这次补充。下一版会接入继续完善生成。');
+    setRefinementText('');
+  };
+
+  return (
+    <div className="space-y-4">
+      <section className="relative overflow-hidden rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_24px_70px_rgba(0,80,180,0.12)] sm:p-7">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#2463EB] via-[#5DA2FF] to-[#D9E8FF]" />
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#2463EB] shadow-[0_14px_28px_rgba(36,99,235,0.22)]">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-[#2463EB]">Solution Workspace</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#111827]">解决工作台</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+              FutureLens 会先理解你的问题，再直接生成一版可以使用的成果。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
+          一、我理解你的核心问题
+        </div>
+        <h2 className="text-lg font-semibold leading-relaxed text-[#111827]">{result.problemCore.summary}</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl bg-[#F8FAFD] p-4">
+            <div className="text-xs font-semibold text-[#64748B]">真正卡住的是</div>
+            <p className="mt-2 text-sm leading-relaxed text-[#1F2937]">{result.problemCore.realBlocker}</p>
+          </div>
+          <div className="rounded-2xl bg-[#F8FAFD] p-4">
+            <div className="text-xs font-semibold text-[#64748B]">为什么重要</div>
+            <p className="mt-2 text-sm leading-relaxed text-[#1F2937]">{result.problemCore.whyItMatters}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F3F7FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
+          二、本次匹配的 Skill
+        </div>
+        <div className="rounded-2xl bg-gradient-to-br from-[#F3F7FF] to-white p-4 ring-1 ring-[#E1ECFF]">
+          <div className="text-lg font-semibold text-[#111827]">{result.skillMatched.name}</div>
+          <p className="mt-2 text-sm leading-relaxed text-[#64748B]">{result.skillMatched.reason}</p>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          三、关键追问
+        </div>
+        <p className="mb-4 text-sm leading-relaxed text-[#64748B]">
+          这些问题会让成果更准确；即使暂时不回答，下面也先给你一版可用成果。
+        </p>
+        <div className="space-y-2">
+          {result.clarifyingQuestions.slice(0, 4).map((question, index) => (
+            <div key={question} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
+                {index + 1}
+              </div>
+              <p className="text-sm leading-relaxed text-[#1F2937]">{question}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
+          四、先给你一版可用成果
+        </div>
+        <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
+        <div className="mt-5 space-y-3">
+          {result.usableOutput.sections.map(section => (
+            <div key={section.heading} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
+              <h3 className="text-sm font-semibold text-[#111827]">{section.heading}</h3>
+              <pre className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#374151]">{section.content}</pre>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          五、可直接复制 / 使用的内容
+        </div>
+        <div className="space-y-3">
+          {result.copyableTemplates.map(template => (
+            <div key={template.title} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-[#111827]">{template.title}</h3>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#64748B] ring-1 ring-[#E5EAF3]">
+                  可复制
+                </span>
+              </div>
+              <pre className="whitespace-pre-wrap break-words rounded-2xl bg-white p-3 text-xs leading-6 text-[#1F2937] ring-1 ring-[#E5EAF3]">
+                {template.content}
+              </pre>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          六、继续完善
+        </div>
+        <h2 className="text-lg font-semibold text-[#111827]">继续完善</h2>
+        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+          补充你的真实情况，FutureLens 可以继续把这版成果改得更准确。
+        </p>
+        <textarea
+          value={refinementText}
+          onChange={(event) => {
+            setRefinementText(event.target.value.slice(0, 1200));
+            setRefinementNote(null);
+          }}
+          rows={4}
+          placeholder={result.nextRefinementPrompt}
+          className="mt-4 w-full rounded-2xl border border-[#D6E6FF] bg-[#FBFCFF] px-4 py-3 text-sm leading-relaxed text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#2463EB] focus:outline-none"
+        />
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-xs text-[#9CA3AF]">第一版先记录在本页状态中，后续会接入继续生成。</span>
+          <button
+            type="button"
+            onClick={handleRefine}
+            disabled={!refinementText.trim()}
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#111827] px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            记录补充
+          </button>
+        </div>
+        {refinementNote && (
+          <p className="mt-3 rounded-2xl bg-[#F4FBF5] px-4 py-3 text-xs leading-relaxed text-[#248A3D]">
+            {refinementNote}
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ============================================================
 // V6.5 二级折叠区域：系统分析依据
 // ============================================================
@@ -1022,7 +1174,7 @@ function CollapsibleAnalysis({ children, defaultOpen = false }: CollapsibleAnaly
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between py-3 px-4 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] hover:bg-[#F3F4F6] transition-colors"
       >
-        <span className="text-sm font-medium text-[#6B7280]">查看 FutureLens 为什么这样判断</span>
+        <span className="text-sm font-medium text-[#6B7280]">旧版分析，仅调试查看</span>
         {isOpen ? (
           <ChevronUp className="w-4 h-4 text-[#9CA3AF]" />
         ) : (
@@ -1600,6 +1752,9 @@ export default function RadarPage() {
     }
   }, [radarData]);
 
+  const latestEvidence = evidenceHistory[0] || null;
+  const tonightAction = radarData?.actions.find(a => a.time === '今晚') || radarData?.actions[0];
+
   const handleVerificationSubmitV2 = async (
     result: { outcome: ResultOption; userResult: string; userDiscovery: string }
   ) => {
@@ -1828,43 +1983,28 @@ export default function RadarPage() {
     );
   }
 
-  const tonightAction = radarData.actions.find(a => a.time === '今晚') || radarData.actions[0];
-  const latestEvidence = evidenceHistory[0] || null;
-  const evidenceImpact = getEvidenceImpact(latestEvidence);
-  const currentVerificationAction = latestEvidence && evidenceImpact
-    ? {
-        ...tonightAction,
-        task: evidenceImpact.nextAction,
-        platform: undefined,
-        keywords: undefined,
-        action: undefined,
-        successCriteria: '得到一个能够支持、削弱或改变当前判断的具体结果。',
-      }
-    : tonightAction;
-  const verificationContext = latestEvidence
-    ? getVerificationContextForCategory(latestEvidence.category, currentVerificationAction.task)
-    : getVerificationContext(currentVerificationAction);
+  const solutionResult = radarData.solutionResult || buildSolutionResult(profile, radarData);
 
-  // V7.2 验证闭环
+  // Solution Core v0.5 Step 1：解决工作台
   return (
     <div className="min-h-screen bg-[#F5F5F7]">
       <header className="sticky top-0 bg-[#F5F5F7]/80 backdrop-blur-xl border-b border-[#E5E7EB] z-10">
-        <div className="max-w-2xl mx-auto px-5 py-3 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-5 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-[#007AFF] text-sm font-medium">
             <ChevronRight className="w-5 h-5 rotate-180" />
             <span>返回</span>
           </Link>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-[#FF9500]/12 flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-[#FF9500]" />
+            <div className="w-6 h-6 rounded-lg bg-[#2463EB]/12 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-[#2463EB]" />
             </div>
-            <span className="text-base font-semibold">FutureLens</span>
+            <span className="text-base font-semibold">解决工作台</span>
           </div>
           <button
             onClick={handleUpdateChanges}
             disabled={isRegenerating}
-            aria-label="重新判断"
-            title="重新判断"
+            aria-label="重新生成"
+            title="重新生成"
             className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-[#6B7280] hover:bg-white transition-colors disabled:opacity-50"
           >
             {isRegenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -1872,65 +2012,19 @@ export default function RadarPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-5 py-8 sm:py-10">
-        <div className="mb-7">
-          <p className="text-sm text-[#9CA3AF]">不用先想清楚全部，只确认下一件最重要的事。</p>
-        </div>
+      <main className="max-w-3xl mx-auto px-5 py-8 sm:py-10">
+        <SolutionWorkspaceCard result={solutionResult} />
 
-        <div className="space-y-4">
+        <CollapsibleAnalysis>
           <CoreInsightCard
             coreInsight={radarData.coreInsight}
             latestEvidence={latestEvidence}
           />
-
           <SolutionPackPreviewCard
             solutionPack={radarData.solutionPack}
             onAnalyzeMaterial={handleAnalyzeMaterial}
             isAnalyzingMaterial={isAnalyzingMaterial}
           />
-
-          {latestEvidence && (
-            <UpdatedJudgmentCard record={latestEvidence} />
-          )}
-
-          <RiskEngineCard
-            risk30Days={radarData.impactOnUser?.risk30Days || '问题可能进一步积累'}
-            risk90Days={radarData.impactOnUser?.risk90Days || '问题可能进一步恶化'}
-            mostLikelyResult={radarData.impactOnUser?.mostLikelyResult || '问题持续存在'}
-          />
-
-          <VerificationGapCard
-            context={verificationContext}
-            latestEvidence={latestEvidence}
-          />
-
-          {tonightAction && (
-            <TonightActionCard
-              action={currentVerificationAction}
-              phase={verificationPhase}
-              onStart={() => setVerificationPhase('started')}
-              onRecord={() => setVerificationPhase('recording')}
-            />
-          )}
-
-          {verificationPhase === 'recording' && currentVerificationAction && (
-            <RecordDiscoveryCard
-              action={currentVerificationAction}
-              context={verificationContext}
-              error={discoveryError}
-              isSubmitting={isSavingDiscovery}
-              onCancel={() => {
-                setDiscoveryError(null);
-                setVerificationPhase('started');
-              }}
-              onSubmit={handleVerificationSubmitV2}
-            />
-          )}
-
-          <RecentDiscoveriesCard records={evidenceHistory} />
-        </div>
-
-        <CollapsibleAnalysis>
           <TodayChangesCard changes={radarData.todayChanges} />
           <PersonalImpactCard personalImpact={radarData.personalImpact} />
           {userState && (
@@ -1950,10 +2044,10 @@ export default function RadarPage() {
 
         <div className="flex items-center justify-center gap-3 pt-8 pb-6">
           <Link href="/profile" className="text-xs text-[#9CA3AF] hover:text-[#6B7280] transition-colors">
-            更新我的情况
+            补充问题背景
           </Link>
           <span className="text-[#D1D5DB]">·</span>
-          <span className="text-xs text-[#9CA3AF]">结果可能会随着你的反馈改变</span>
+          <span className="text-xs text-[#9CA3AF]">继续补充后，可以重新生成更贴近你的成果</span>
         </div>
       </main>
     </div>

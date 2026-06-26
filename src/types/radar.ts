@@ -340,6 +340,37 @@ export type SolutionPack = {
   executionPlan?: ExecutionPlan;
 };
 
+export type SolutionSkillName =
+  | '工作流生成 Skill'
+  | '材料生成 Skill'
+  | '学习路径 Skill'
+  | '通用解决 Skill';
+
+export type SolutionResult = {
+  problemCore: {
+    summary: string;
+    realBlocker: string;
+    whyItMatters: string;
+  };
+  skillMatched: {
+    name: SolutionSkillName;
+    reason: string;
+  };
+  clarifyingQuestions: string[];
+  usableOutput: {
+    title: string;
+    sections: Array<{
+      heading: string;
+      content: string;
+    }>;
+  };
+  copyableTemplates: Array<{
+    title: string;
+    content: string;
+  }>;
+  nextRefinementPrompt: string;
+};
+
 // V5.5 Personal Impact 类型
 export type PersonalImpact = {
   affectedPart: string;
@@ -362,6 +393,7 @@ export type OpportunityRadarV4 = {
   personalImpact?: PersonalImpact;
   coreInsight?: CoreInsight;  // V6.1 新增
   solutionPack?: SolutionPack;  // Phase 1 新增：并行保留旧 Radar 字段
+  solutionResult?: SolutionResult;  // V0.5 新增：Solution Workspace 主展示
   valueMigration?: ValueMigration;  // V6.0 新增
   impactOnUser: ImpactOnUser;
   decisionExplanation?: DecisionExplanation;  // V5.8 新增

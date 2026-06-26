@@ -13,6 +13,7 @@ import {
   type CareerActionMode,
 } from '@/lib/careerAction';
 import { ensureSolutionPack } from '@/lib/solutionPack';
+import { buildSolutionResult } from '@/lib/solutionEngine';
 
 export interface GenerateRadarRequest {
   profile: FutureProfile;
@@ -648,8 +649,57 @@ JSON格式：
       }
     ]
   },
+  "solutionResult": {
+    "problemCore": {
+      "summary": "我理解你的核心问题，一句话说清楚，不要只复述用户输入",
+      "realBlocker": "真正卡住用户的点，必须具体到结构、字段、标准、材料、流程或练习环节",
+      "whyItMatters": "为什么这个阻碍会影响推进"
+    },
+    "skillMatched": {
+      "name": "工作流生成 Skill | 材料生成 Skill | 学习路径 Skill | 通用解决 Skill",
+      "reason": "为什么这个问题匹配这个 Skill"
+    },
+    "clarifyingQuestions": [
+      "关键追问1",
+      "关键追问2",
+      "关键追问3"
+    ],
+    "usableOutput": {
+      "title": "先给你一版可用成果的标题",
+      "sections": [
+        {
+          "heading": "成果小节标题",
+          "content": "必须是可直接执行或使用的内容，不要只写建议"
+        }
+      ]
+    },
+    "copyableTemplates": [
+      {
+        "title": "可复制内容标题",
+        "content": "模板、表格字段、公式、文案、SOP 或清单正文"
+      }
+    ],
+    "nextRefinementPrompt": "引导用户继续补充真实情况的一句话"
+  },
   "futureSelfMessage": "未来分身给现在用户的提醒，必须引用变化→影响→行动，不要空泛，200字以内"
 }
+
+【Solution Workspace v0.5 强制要求】
+你必须把 /radar 当成解决工作台，而不是分析报告。
+solutionResult 是主产物，必须满足：
+1. 不要只给建议，必须给第一版可用成果。
+2. 即使信息不足，也要基于合理假设先生成可用版本。
+3. 必须提出 2-4 个关键追问，但不能因为用户没回答就停止生成。
+4. 必须提供可复制内容：模板、表格字段、公式、文案、SOP、清单或学习计划。
+5. 文风要像解决问题的执行系统，不像 AI 报告。
+6. 禁止只输出“你可以先整理资料 / 学习工具 / 多看看案例”。
+7. 如果用户是财务报表场景，必须输出报表结构、字段设计、Excel 公式、图表建议和汇报文案。
+8. 如果用户是作品集场景，必须输出作品集修改工作流、项目说明模板和评审反馈问题清单。
+9. Skill 匹配规则：
+   - 报表、流程、SOP、工作流、汇报、整理、效率、表格、Excel、复盘、项目管理 => 工作流生成 Skill
+   - 简历、作品集、文案、说明、申请、汇报稿、商业计划书、BP、介绍、讲稿、邮件 => 材料生成 Skill
+   - 学习、备考、雅思、AI、技能、转行、路线、计划、复习、练习 => 学习路径 Skill
+   - 都不匹配 => 通用解决 Skill
 
 【V5.8 Decision Transparency 要求】
 你必须解释为什么推荐这些行动，而不是只告诉用户做什么！
@@ -1063,12 +1113,16 @@ export async function POST(request: NextRequest) {
       profile,
       body.userStateProfile
     );
-    const radarData = ensureSolutionPack(
+    const radarDataWithSolutionPack = ensureSolutionPack(
       alignedRadarData,
       profile,
       body.userStateProfile,
       { attachedContext: normalizeAttachedContext(body.attachedContext) }
     );
+    const radarData = {
+      ...radarDataWithSolutionPack,
+      solutionResult: radarDataWithSolutionPack.solutionResult || buildSolutionResult(profile, radarDataWithSolutionPack),
+    };
 
     // 检查是否是 fallback（解析失败）
     const isFallback = !response.includes('"todayChanges"') && !response.trim().startsWith('{');
@@ -1084,7 +1138,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[API/Radar/Generate] 生成失败:', error);
 
-    const fallbackRadar = requestBody?.profile
+    const fallbackRadarWithSolutionPack = requestBody?.profile
       ? ensureSolutionPack(
           createFallbackRadar(),
           requestBody.profile,
@@ -1092,6 +1146,12 @@ export async function POST(request: NextRequest) {
           { attachedContext: normalizeAttachedContext(requestBody.attachedContext) }
         )
       : createFallbackRadar();
+    const fallbackRadar = requestBody?.profile
+      ? {
+          ...fallbackRadarWithSolutionPack,
+          solutionResult: fallbackRadarWithSolutionPack.solutionResult || buildSolutionResult(requestBody.profile, fallbackRadarWithSolutionPack),
+        }
+      : fallbackRadarWithSolutionPack;
 
     // 发生错误时也返回 fallback，而不是 500
     return NextResponse.json({
