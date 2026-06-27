@@ -6,6 +6,7 @@ import { Sparkles, ChevronRight, Loader2, RefreshCw, AlertCircle, Zap, TrendingU
 import { loadProfile } from '@/lib/radar';
 import { getChangeSignalsForProfile, generateProfileHash } from '@/lib/changeEngine';
 import { analyzeUserState } from '@/lib/stateEngine';
+import { routeCapabilities, type CapabilityPlan } from '@/lib/capabilityRouter';
 import { buildRefinedSolutionResult, buildSolutionResult } from '@/lib/solutionEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
 import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
@@ -1131,7 +1132,7 @@ function RefinedResultCard({ result }: { result: SolutionResult }) {
   return (
     <section className="rounded-3xl border border-[#B7D3FF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
       <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
-        6. 第二版结果
+        第二版结果
       </div>
       <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
       {result.refinementSummary && (
@@ -1154,7 +1155,63 @@ function RefinedResultCard({ result }: { result: SolutionResult }) {
   );
 }
 
-function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; profile: FutureProfile }) {
+function CapabilityPlanCard({ plan }: { plan: CapabilityPlan }) {
+  return (
+    <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+      <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+        2. 这件事需要调用的能力
+      </div>
+      <p className="text-sm leading-relaxed text-[#64748B]">{plan.demandSummary}</p>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {plan.requiredCapabilities.map(capability => (
+          <div key={capability.id} className="rounded-2xl bg-[#FBFCFF] p-3 ring-1 ring-[#E5EAF3]">
+            <div className="text-sm font-semibold text-[#111827]">{capability.label}</div>
+            <p className="mt-1 text-xs leading-relaxed text-[#64748B]">{capability.reason}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {plan.recommendedExecutors.map(executor => (
+          <span
+            key={executor.id}
+            className="rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-medium text-[#2463EB]"
+          >
+            {executor.label}{executor.status === 'planned' ? '（待接入）' : ''}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ExecutionPlanCard({ plan }: { plan: CapabilityPlan }) {
+  return (
+    <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+      <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+        3. FutureLens 将这样执行
+      </div>
+      <div className="space-y-2">
+        {plan.executionSteps.map((step, index) => (
+          <div key={step} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
+              {index + 1}
+            </div>
+            <p className="text-sm leading-relaxed text-[#1F2937]">{step}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {plan.expectedDeliverables.map(deliverable => (
+          <span key={deliverable} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#64748B] ring-1 ring-[#E5EAF3]">
+            {deliverable}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: SolutionResult; profile: FutureProfile; capabilityPlan: CapabilityPlan }) {
   const [refinementText, setRefinementText] = useState('');
   const [refinementNote, setRefinementNote] = useState<string | null>(null);
   const [refinedResult, setRefinedResult] = useState<SolutionResult | null>(null);
@@ -1179,7 +1236,7 @@ function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; pr
             <p className="text-xs font-semibold text-[#2463EB]">Solution Workspace</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#111827]">解决工作台</h1>
             <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
-              FutureLens 会先理解你的问题，再直接生成一版可以使用的成果。
+              FutureLens 会先理解你的需求，再组织需要的能力，生成一版可以使用的成果。
             </p>
           </div>
         </div>
@@ -1187,14 +1244,18 @@ function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; pr
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
-          1. 我理解你的问题
+          1. 我理解你的需求
         </div>
         <p className="text-base font-semibold leading-relaxed text-[#111827]">{result.problemCore.summary}</p>
       </section>
 
+      <CapabilityPlanCard plan={capabilityPlan} />
+
+      <ExecutionPlanCard plan={capabilityPlan} />
+
       <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
-          2. 我先给你一版结果
+          4. FutureLens 已生成第一版结果
         </div>
         <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
         <div className="mt-5 space-y-3">
@@ -1209,7 +1270,7 @@ function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; pr
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          3. 可直接复制使用
+          5. 可直接复制使用
         </div>
         <div className="space-y-3">
           {result.copyableTemplates.map(template => (
@@ -1220,7 +1281,7 @@ function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; pr
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          4. 想更准，只补充 3 个信息
+          6. 想更准，只补充 3 个信息
         </div>
         <div className="space-y-2">
           {result.clarifyingQuestions.slice(0, 3).map((question, index) => (
@@ -1236,9 +1297,9 @@ function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; pr
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          5. 继续完善
+          7. 继续让 FutureLens 调整
         </div>
-        <h2 className="text-lg font-semibold text-[#111827]">继续完善</h2>
+        <h2 className="text-lg font-semibold text-[#111827]">继续让 FutureLens 调整</h2>
         <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
           补充你的真实情况，FutureLens 可以继续把这版成果改得更准确。
         </p>
@@ -1680,6 +1741,17 @@ const RADAR_PROFILE_HASH_KEY = 'futurelens-latest-radar-profile-hash';
 const RADAR_USER_STATE_KEY = 'futurelens-latest-user-state';
 const EVIDENCE_HISTORY_KEY = 'futurelens-evidence-history';
 
+function getProfileProblemText(profile: FutureProfile): string {
+  return [
+    profile.currentSituation,
+    profile.currentGoal,
+    profile.desiredOutcome,
+    profile.currentSkills,
+    profile.currentAnxiety,
+    profile.majorOrCareer,
+  ].filter(Boolean).join(' ').trim();
+}
+
 export default function RadarPage() {
   const [profile, setProfile] = useState<FutureProfile | null>(null);
   const [radarData, setRadarData] = useState<OpportunityRadarV4 | null>(null);
@@ -2109,6 +2181,7 @@ export default function RadarPage() {
   }
 
   const solutionResult = buildSolutionResult(profile, radarData);
+  const capabilityPlan = routeCapabilities(getProfileProblemText(profile));
 
   // Solution Core v0.5 Step 1：解决工作台
   return (
@@ -2138,7 +2211,7 @@ export default function RadarPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-5 py-8 sm:py-10">
-        <SolutionWorkspaceCard result={solutionResult} profile={profile} />
+        <SolutionWorkspaceCard result={solutionResult} profile={profile} capabilityPlan={capabilityPlan} />
 
         {showDebugAnalysis && (
           <CollapsibleAnalysis>

@@ -31,6 +31,13 @@ function isExistingMaterialInput(text: string): boolean {
 }
 
 function matchSkill(text: string): SolutionResult['skillMatched'] {
+  if (/(作品集|设计|视觉|portfolio)/i.test(text)) {
+    return {
+      name: '材料生成 Skill',
+      reason: '这个问题的核心是产出一份能直接修改或交付的材料，需要先给出结构、模板和可复制文本。',
+    };
+  }
+
   if (/(报表|流程|sop|工作流|汇报|整理|效率|表格|excel|复盘|项目管理|自动化|月度经营)/i.test(text)) {
     return {
       name: '工作流生成 Skill',
@@ -98,6 +105,22 @@ function getProblemCore(profile: FutureProfile, skillName: SolutionSkillName): S
       summary: '你真正卡住的不是找不到学习方法，而是不知道今天该练哪一个最小环节，以及练完如何判断有效。',
       realBlocker: '目标太大时，学习会变成收藏资料和换计划。你需要一套今天就能执行、能留下结果的训练单位。',
       whyItMatters: '只有每次练习都能留下卡点和结果，下一步才会越来越准。',
+    };
+  }
+
+  if (/(流程|工作流|每天先做什么|优先级|效率|sop|自动化|项目管理)/i.test(text)) {
+    return {
+      summary: '你现在需要的不是更多待办事项，而是把混乱工作拆成固定入口、优先级和每天可重复执行的流程。',
+      realBlocker: '真正卡住的是任务没有被分层：哪些必须今天做、哪些可以模板化、哪些可以自动化，还没有被区分出来。',
+      whyItMatters: '先固定工作流，后面才知道该用什么工具、哪些节点值得自动化，而不是每天重新判断先做什么。',
+    };
+  }
+
+  if (/(短视频|视频方案|视频脚本|分镜|拍摄|剪辑|口播)/i.test(text)) {
+    return {
+      summary: '你想做一个短视频方案，当前需要先把选题、脚本、分镜和画面提示词组织成一版可执行方案。',
+      realBlocker: '真正卡住的不是缺一个灵感，而是还没有把视频拆成开头钩子、信息结构、镜头画面和生成准备。',
+      whyItMatters: '短视频如果只停在想法，会很难拍或生成。先给出脚本和分镜，后续才能继续交给视频生成模型或剪辑流程。',
     };
   }
 
@@ -232,6 +255,98 @@ function buildLearningOutput(): Pick<SolutionResult, 'clarifyingQuestions' | 'us
       },
     ],
     nextRefinementPrompt: '例如：我每天只有 40 分钟，最卡的是口语表达和坚持。',
+  };
+}
+
+function buildWorkflowOutput(): Pick<SolutionResult, 'clarifyingQuestions' | 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'> {
+  return {
+    clarifyingQuestions: [
+      '你每天最重复、最容易乱的任务是哪一类？',
+      '这些任务里哪些必须当天完成？',
+      '你现在主要用纸笔、微信、表格，还是项目管理工具记录？',
+    ],
+    usableOutput: {
+      title: '每日工作流第一版',
+      sections: [
+        {
+          heading: '1. 工作流结构',
+          content: '收集入口：把所有任务先放到同一个入口\n分类处理：按“今天必须 / 本周推进 / 等待别人 / 可自动化”分组\n执行顺序：先做影响最大且有截止时间的任务\n复盘出口：每天结束只记录 3 件事：完成了什么、卡在哪里、明天第一件事是什么',
+        },
+        {
+          heading: '2. 优先级清单',
+          content: 'A 类：今天不做会影响交付或别人推进\nB 类：本周必须推进，但今天不一定完成\nC 类：可以模板化、批处理或交给工具辅助\nD 类：暂时不做，只保留记录',
+        },
+        {
+          heading: '3. 每日执行流程',
+          content: '09:00 统一收集任务 → 09:15 标记 A/B/C/D → 09:30 先完成 1 个 A 类任务 → 下午批处理 B 类任务 → 下班前 10 分钟写明天第一件事。',
+        },
+        {
+          heading: '4. 可自动化节点建议',
+          content: '重复汇总、固定格式回复、每周报表、会议纪要、资料整理都可以先模板化。不要一开始追求全自动，先把输入和输出固定下来。',
+        },
+      ],
+    },
+    copyableTemplates: [
+      {
+        title: '每日优先级表',
+        content: '| 任务 | 类型 A/B/C/D | 截止时间 | 影响对象 | 下一步动作 |\n| --- | --- | --- | --- | --- |\n|  |  |  |  |  |',
+      },
+      {
+        title: '每日执行 SOP',
+        content: '1. 收集所有任务\n2. 标记 A/B/C/D\n3. 先做 1 个 A 类任务\n4. 批处理 B 类任务\n5. 记录可模板化节点\n6. 写下明天第一件事',
+      },
+    ],
+    nextRefinementPrompt: '例如：我每天主要乱在消息、报表和临时需求，不知道怎么排优先级。',
+  };
+}
+
+function buildVideoOutput(): Pick<SolutionResult, 'clarifyingQuestions' | 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'> {
+  return {
+    clarifyingQuestions: [
+      '这条短视频想给谁看？',
+      '你希望视频让观众产生什么动作：关注、咨询、购买，还是理解一个观点？',
+      '你想真人出镜、图文混剪，还是 AI 生成画面？',
+    ],
+    usableOutput: {
+      title: '短视频方案第一版',
+      sections: [
+        {
+          heading: '1. 视频选题',
+          content: '选题：用一个真实问题开头，展示“问题 → 误区 → 可执行方法”。\n示例标题：普通人怎么把一个模糊想法变成今天能做的计划？',
+        },
+        {
+          heading: '2. 60 秒脚本',
+          content: '0-5 秒：说出痛点，引发代入\n5-20 秒：指出常见误区\n20-45 秒：给出 3 步方法\n45-60 秒：展示结果，并引导观众带着自己的问题尝试',
+        },
+        {
+          heading: '3. 分镜结构',
+          content: '镜头 1：人物正面说出问题\n镜头 2：屏幕展示混乱信息\n镜头 3：画面切到三步流程\n镜头 4：展示生成出的清单或模板\n镜头 5：结尾给出行动提示',
+        },
+        {
+          heading: '4. 画面提示词',
+          content: '浅色桌面、笔记本电脑、干净 UI、蓝白科技感、真实工作场景、镜头缓慢推进、画面清晰克制。',
+        },
+        {
+          heading: '5. 视频生成建议',
+          content: '当前版本先生成脚本、分镜和画面提示词。视频生成模型后续接入后，可以继续把分镜转成画面或短片。',
+        },
+      ],
+    },
+    copyableTemplates: [
+      {
+        title: '短视频脚本模板',
+        content: '开头痛点：\n常见误区：\n三步方法：\n展示结果：\n结尾行动：',
+      },
+      {
+        title: '分镜表',
+        content: '| 镜头 | 画面 | 旁白 | 时长 | 备注 |\n| --- | --- | --- | --- | --- |\n| 1 |  |  |  |  |',
+      },
+      {
+        title: '画面提示词',
+        content: '浅色桌面，蓝白科技感，真实工作场景，笔记本电脑显示干净产品界面，柔和自然光，镜头缓慢推进，画面正式可信。',
+      },
+    ],
+    nextRefinementPrompt: '例如：这是给小红书看的，我想真人口播，主题是用 AI 提高工作效率。',
   };
 }
 
@@ -500,6 +615,10 @@ export function buildSolutionResult(
       ? buildFinanceReportOutput()
       : /(作品集|设计|视觉|portfolio)/i.test(text)
         ? buildPortfolioOutput()
+      : /(流程|工作流|每天先做什么|优先级|效率|sop|自动化|项目管理)/i.test(text)
+        ? buildWorkflowOutput()
+      : /(短视频|视频方案|视频脚本|分镜|拍摄|剪辑|口播)/i.test(text)
+        ? buildVideoOutput()
         : skillMatched.name === '学习路径 Skill'
           ? buildLearningOutput()
           : buildGenericOutput(skillMatched.name);
