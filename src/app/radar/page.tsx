@@ -1132,7 +1132,7 @@ function RefinedResultCard({ result }: { result: SolutionResult }) {
   return (
     <section className="rounded-3xl border border-[#B7D3FF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
       <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
-        第二版结果
+        6. 第二版结果
       </div>
       <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
       {result.refinementSummary && (
@@ -1155,42 +1155,27 @@ function RefinedResultCard({ result }: { result: SolutionResult }) {
   );
 }
 
-function CapabilityPlanCard({ plan }: { plan: CapabilityPlan }) {
+function ProcessingPlanCard({ plan }: { plan: CapabilityPlan }) {
   return (
     <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
       <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-        2. 这件事需要调用的能力
+        2. FutureLens 会这样帮你处理
       </div>
       <p className="text-sm leading-relaxed text-[#64748B]">{plan.demandSummary}</p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {plan.requiredCapabilities.map(capability => (
-          <div key={capability.id} className="rounded-2xl bg-[#FBFCFF] p-3 ring-1 ring-[#E5EAF3]">
-            <div className="text-sm font-semibold text-[#111827]">{capability.label}</div>
-            <p className="mt-1 text-xs leading-relaxed text-[#64748B]">{capability.reason}</p>
-          </div>
-        ))}
+      <div className="mt-4">
+        <div className="mb-2 text-xs font-semibold text-[#9CA3AF]">这件事会用到</div>
+        <div className="flex flex-wrap gap-2">
+          {plan.requiredCapabilities.map(capability => (
+            <span
+              key={capability.id}
+              className="rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-medium text-[#2463EB]"
+            >
+              {capability.label}
+            </span>
+          ))}
+        </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {plan.recommendedExecutors.map(executor => (
-          <span
-            key={executor.id}
-            className="rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-medium text-[#2463EB]"
-          >
-            {executor.label}{executor.status === 'planned' ? '（待接入）' : ''}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ExecutionPlanCard({ plan }: { plan: CapabilityPlan }) {
-  return (
-    <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
-      <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-        3. FutureLens 将这样执行
-      </div>
-      <div className="space-y-2">
+      <div className="mt-4 space-y-2">
         {plan.executionSteps.map((step, index) => (
           <div key={step} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
@@ -1200,7 +1185,7 @@ function ExecutionPlanCard({ plan }: { plan: CapabilityPlan }) {
           </div>
         ))}
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-[#EEF2F7] pt-4">
         {plan.expectedDeliverables.map(deliverable => (
           <span key={deliverable} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#64748B] ring-1 ring-[#E5EAF3]">
             {deliverable}
@@ -1249,13 +1234,11 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
         <p className="text-base font-semibold leading-relaxed text-[#111827]">{result.problemCore.summary}</p>
       </section>
 
-      <CapabilityPlanCard plan={capabilityPlan} />
-
-      <ExecutionPlanCard plan={capabilityPlan} />
+      <ProcessingPlanCard plan={capabilityPlan} />
 
       <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
-          4. FutureLens 已生成第一版结果
+          3. 已生成第一版结果
         </div>
         <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
         <div className="mt-5 space-y-3">
@@ -1270,7 +1253,7 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          5. 可直接复制使用
+          4. 可直接复制使用
         </div>
         <div className="space-y-3">
           {result.copyableTemplates.map(template => (
@@ -1281,9 +1264,13 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          6. 想更准，只补充 3 个信息
+          5. 继续让 FutureLens 调整
         </div>
-        <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-[#111827]">继续让 FutureLens 调整</h2>
+        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+          补充你的真实情况，FutureLens 可以继续把这版成果改得更准确。
+        </p>
+        <div className="mt-4 space-y-2">
           {result.clarifyingQuestions.slice(0, 3).map((question, index) => (
             <div key={question} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
@@ -1293,16 +1280,6 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
             </div>
           ))}
         </div>
-      </section>
-
-      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
-        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          7. 继续让 FutureLens 调整
-        </div>
-        <h2 className="text-lg font-semibold text-[#111827]">继续让 FutureLens 调整</h2>
-        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
-          补充你的真实情况，FutureLens 可以继续把这版成果改得更准确。
-        </p>
         <textarea
           value={refinementText}
           onChange={(event) => {

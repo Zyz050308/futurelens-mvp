@@ -120,7 +120,7 @@ function getProblemCore(profile: FutureProfile, skillName: SolutionSkillName): S
     return {
       summary: '你想做一个短视频方案，当前需要先把选题、脚本、分镜和画面提示词组织成一版可执行方案。',
       realBlocker: '真正卡住的不是缺一个灵感，而是还没有把视频拆成开头钩子、信息结构、镜头画面和生成准备。',
-      whyItMatters: '短视频如果只停在想法，会很难拍或生成。先给出脚本和分镜，后续才能继续交给视频生成模型或剪辑流程。',
+      whyItMatters: '短视频如果只停在想法，会很难拍或生成。先给出脚本和分镜，后续才能继续进入拍摄、剪辑或画面生成流程。',
     };
   }
 
@@ -327,8 +327,8 @@ function buildVideoOutput(): Pick<SolutionResult, 'clarifyingQuestions' | 'usabl
           content: '浅色桌面、笔记本电脑、干净 UI、蓝白科技感、真实工作场景、镜头缓慢推进、画面清晰克制。',
         },
         {
-          heading: '5. 视频生成建议',
-          content: '当前版本先生成脚本、分镜和画面提示词。视频生成模型后续接入后，可以继续把分镜转成画面或短片。',
+          heading: '5. 画面生成准备',
+          content: '先把脚本、分镜和画面提示词整理成统一素材包。下一步可以继续细化镜头风格、人物动作、场景道具和画面节奏。',
         },
       ],
     },

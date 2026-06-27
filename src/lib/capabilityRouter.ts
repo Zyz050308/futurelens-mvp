@@ -188,7 +188,7 @@ const capabilityLabels: Record<SolutionCapabilityId, string> = {
   script_generation: '脚本生成',
   storyboard_generation: '分镜生成',
   visual_prompting: '画面提示词生成',
-  video_generation: '视频生成模型调用',
+  video_generation: '视频生成准备',
   study_planning: '学习路径规划',
   practice_generation: '练习生成',
   general_reasoning: '通用推理',
@@ -271,7 +271,7 @@ export function routeCapabilities(problemText: string): CapabilityPlan {
         '把短视频想法变成脚本、分镜和可交给生成工具的画面提示'
       ),
       recommendedExecutors: createExecutors(['LLM_REASONING', 'VISUAL_PROMPTING', 'VIDEO_GENERATION_MODEL']),
-      executionSteps: ['先确定视频主题和受众', '生成 30-60 秒脚本', '拆成 4-6 个镜头', '输出每个镜头的画面提示词', '视频生成模型待接入后可继续生成画面'],
+      executionSteps: ['先确定视频主题和受众', '生成 30-60 秒脚本', '拆成 4-6 个镜头', '输出每个镜头的画面提示词', '整理成后续可继续生成画面的素材包'],
       expectedDeliverables: ['视频选题', '脚本', '分镜', '画面提示词', '视频生成建议'],
     };
   }
