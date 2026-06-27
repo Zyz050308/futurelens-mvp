@@ -6,7 +6,7 @@ import { Sparkles, ChevronRight, Loader2, RefreshCw, AlertCircle, Zap, TrendingU
 import { loadProfile } from '@/lib/radar';
 import { getChangeSignalsForProfile, generateProfileHash } from '@/lib/changeEngine';
 import { analyzeUserState } from '@/lib/stateEngine';
-import { buildSolutionResult } from '@/lib/solutionEngine';
+import { buildRefinedSolutionResult, buildSolutionResult } from '@/lib/solutionEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
 import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
@@ -1004,15 +1004,166 @@ function SolutionPackPreviewCard({
   );
 }
 
-function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
+type CopyableTemplate = SolutionResult['copyableTemplates'][number];
+
+const financeFieldCards = [
+  { name: '月份', usage: '记录本月周期', example: '2026年6月' },
+  { name: '收入', usage: '本月总收入', example: '120000' },
+  { name: '成本', usage: '本月总成本', example: '76000' },
+  { name: '毛利', usage: '收入 - 成本', example: '44000' },
+  { name: '毛利率', usage: '毛利 / 收入', example: '36.7%' },
+  { name: '环比', usage: '和上月比较', example: '+8%' },
+  { name: '同比', usage: '和去年同期比较', example: '+12%' },
+];
+
+function parseMarkdownTable(content: string) {
+  const rows = content
+    .split('\n')
+    .map(row => row.trim())
+    .filter(row => row.startsWith('|') && !/^\|\s*-/.test(row));
+
+  return rows.map(row =>
+    row
+      .split('|')
+      .map(cell => cell.trim())
+      .filter(Boolean)
+  );
+}
+
+function CopyableTemplateCard({ template }: { template: CopyableTemplate }) {
+  const [copied, setCopied] = useState(false);
+  const tableRows = parseMarkdownTable(template.content);
+  const isFinanceFieldTable = template.title.includes('月度经营报表字段');
+  const isFieldTable = !isFinanceFieldTable && tableRows.length >= 2;
+  const isFormula = template.title.includes('公式');
+  const isScript = template.title.includes('汇报文案') || template.title.includes('消息模板');
+  const formulaRows = template.content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [label, ...rest] = line.split('=');
+      return {
+        label: label.trim(),
+        formula: rest.length > 0 ? `=${rest.join('=').trim()}` : line,
+      };
+    });
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(template.content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-[#111827]">{template.title}</h3>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#2463EB] ring-1 ring-[#D6E6FF] transition-colors hover:bg-[#EEF5FF]"
+        >
+          {copied ? '已复制' : '复制'}
+        </button>
+      </div>
+
+      {isFinanceFieldTable ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {financeFieldCards.map(field => (
+            <div key={field.name} className="rounded-2xl bg-white p-3 ring-1 ring-[#E5EAF3]">
+              <div className="text-sm font-semibold text-[#111827]">{field.name}</div>
+              <div className="mt-1 text-xs leading-relaxed text-[#64748B]">用途：{field.usage}</div>
+              <div className="mt-2 rounded-xl bg-[#F8FAFD] px-3 py-2 text-xs text-[#374151]">
+                示例：{field.example}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : isFieldTable ? (
+        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#E5EAF3]">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#F8FAFD] text-[#64748B]">
+              <tr>
+                {tableRows[0].map(cell => (
+                  <th key={cell} className="px-3 py-2 font-semibold">{cell}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEF2F7] text-[#374151]">
+              {tableRows.slice(1).map((row, index) => (
+                <tr key={`${template.title}-${index}`}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={`${template.title}-${index}-${cellIndex}`} className="px-3 py-2 leading-relaxed">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : isFormula ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {formulaRows.map(row => (
+            <div key={`${row.label}-${row.formula}`} className="rounded-2xl bg-white p-3 ring-1 ring-[#E5EAF3]">
+              <div className="text-xs font-semibold text-[#64748B]">{row.label}</div>
+              <code className="mt-2 block rounded-xl bg-[#F8FAFD] px-3 py-2 text-xs font-semibold text-[#111827]">
+                {row.formula}
+              </code>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <pre className={`whitespace-pre-wrap break-words rounded-2xl bg-white p-4 text-sm leading-7 text-[#1F2937] ring-1 ring-[#E5EAF3] ${isScript ? 'min-h-32' : ''}`}>
+          {template.content}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function RefinedResultCard({ result }: { result: SolutionResult }) {
+  return (
+    <section className="rounded-3xl border border-[#B7D3FF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
+      <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
+        6. 第二版结果
+      </div>
+      <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
+      {result.refinementSummary && (
+        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">{result.refinementSummary}</p>
+      )}
+      <div className="mt-5 space-y-3">
+        {result.usableOutput.sections.map(section => (
+          <div key={section.heading} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
+            <h3 className="text-sm font-semibold text-[#111827]">{section.heading}</h3>
+            <pre className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#374151]">{section.content}</pre>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 space-y-3">
+        {result.copyableTemplates.map(template => (
+          <CopyableTemplateCard key={template.title} template={template} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SolutionWorkspaceCard({ result, profile }: { result: SolutionResult; profile: FutureProfile }) {
   const [refinementText, setRefinementText] = useState('');
   const [refinementNote, setRefinementNote] = useState<string | null>(null);
+  const [refinedResult, setRefinedResult] = useState<SolutionResult | null>(null);
 
   const handleRefine = () => {
     const value = refinementText.trim();
     if (!value) return;
-    console.log('[Solution Workspace] refinement input:', value);
-    setRefinementNote('已记录这次补充。下一版会接入继续完善生成。');
+    setRefinedResult(buildRefinedSolutionResult(profile, value, result));
+    setRefinementNote('已根据你的补充生成第二版结果。');
     setRefinementText('');
   };
 
@@ -1062,17 +1213,7 @@ function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
         </div>
         <div className="space-y-3">
           {result.copyableTemplates.map(template => (
-            <div key={template.title} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-[#111827]">{template.title}</h3>
-                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#64748B] ring-1 ring-[#E5EAF3]">
-                  可复制
-                </span>
-              </div>
-              <pre className="whitespace-pre-wrap break-words rounded-2xl bg-white p-3 text-xs leading-6 text-[#1F2937] ring-1 ring-[#E5EAF3]">
-                {template.content}
-              </pre>
-            </div>
+            <CopyableTemplateCard key={template.title} template={template} />
           ))}
         </div>
       </section>
@@ -1112,14 +1253,14 @@ function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
           className="mt-4 w-full rounded-2xl border border-[#D6E6FF] bg-[#FBFCFF] px-4 py-3 text-sm leading-relaxed text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#2463EB] focus:outline-none"
         />
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#9CA3AF]">第一版先记录在本页状态中，后续会接入继续生成。</span>
+          <span className="text-xs text-[#9CA3AF]">补充后会在本页生成第二版结果，先不写入数据库。</span>
           <button
             type="button"
             onClick={handleRefine}
             disabled={!refinementText.trim()}
             className="inline-flex h-10 items-center justify-center rounded-full bg-[#111827] px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
           >
-            记录补充
+            生成更准确的一版
           </button>
         </div>
         {refinementNote && (
@@ -1128,6 +1269,8 @@ function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
           </p>
         )}
       </section>
+
+      {refinedResult && <RefinedResultCard result={refinedResult} />}
     </div>
   );
 }
@@ -1550,6 +1693,7 @@ export default function RadarPage() {
   const [isSavingDiscovery, setIsSavingDiscovery] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showDebugAnalysis, setShowDebugAnalysis] = useState(false);
 
   const loadProfileForRadar = async (): Promise<FutureProfile | null> => {
     try {
@@ -1706,6 +1850,10 @@ export default function RadarPage() {
 
   useEffect(() => {
     loadRadar();
+  }, []);
+
+  useEffect(() => {
+    setShowDebugAnalysis(new URLSearchParams(window.location.search).get('debug') === '1');
   }, []);
 
   useEffect(() => {
@@ -1990,34 +2138,36 @@ export default function RadarPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-5 py-8 sm:py-10">
-        <SolutionWorkspaceCard result={solutionResult} />
+        <SolutionWorkspaceCard result={solutionResult} profile={profile} />
 
-        <CollapsibleAnalysis>
-          <CoreInsightCard
-            coreInsight={radarData.coreInsight}
-            latestEvidence={latestEvidence}
-          />
-          <SolutionPackPreviewCard
-            solutionPack={radarData.solutionPack}
-            onAnalyzeMaterial={handleAnalyzeMaterial}
-            isAnalyzingMaterial={isAnalyzingMaterial}
-          />
-          <TodayChangesCard changes={radarData.todayChanges} />
-          <PersonalImpactCard personalImpact={radarData.personalImpact} />
-          {userState && (
-            <UserStateCard
-              userState={userState}
+        {showDebugAnalysis && (
+          <CollapsibleAnalysis>
+            <CoreInsightCard
+              coreInsight={radarData.coreInsight}
               latestEvidence={latestEvidence}
             />
-          )}
-          {radarData.valueMigration && <ValueMigrationCard migration={radarData.valueMigration} />}
-          {radarData.decisionExplanation && <DecisionTransparencyCard explanation={radarData.decisionExplanation} />}
-          <ActionsCard actions={radarData.actions} />
-          <FutureSelfCard
-            message={radarData.futureSelfMessage}
-            evidenceHistory={evidenceHistory}
-          />
-        </CollapsibleAnalysis>
+            <SolutionPackPreviewCard
+              solutionPack={radarData.solutionPack}
+              onAnalyzeMaterial={handleAnalyzeMaterial}
+              isAnalyzingMaterial={isAnalyzingMaterial}
+            />
+            <TodayChangesCard changes={radarData.todayChanges} />
+            <PersonalImpactCard personalImpact={radarData.personalImpact} />
+            {userState && (
+              <UserStateCard
+                userState={userState}
+                latestEvidence={latestEvidence}
+              />
+            )}
+            {radarData.valueMigration && <ValueMigrationCard migration={radarData.valueMigration} />}
+            {radarData.decisionExplanation && <DecisionTransparencyCard explanation={radarData.decisionExplanation} />}
+            <ActionsCard actions={radarData.actions} />
+            <FutureSelfCard
+              message={radarData.futureSelfMessage}
+              evidenceHistory={evidenceHistory}
+            />
+          </CollapsibleAnalysis>
+        )}
 
         <div className="flex items-center justify-center gap-3 pt-8 pb-6">
           <Link href="/profile" className="text-xs text-[#9CA3AF] hover:text-[#6B7280] transition-colors">

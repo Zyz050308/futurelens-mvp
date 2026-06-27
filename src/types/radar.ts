@@ -369,6 +369,7 @@ export type SolutionResult = {
     content: string;
   }>;
   nextRefinementPrompt: string;
+  refinementSummary?: string;
 };
 
 // V5.5 Personal Impact 类型

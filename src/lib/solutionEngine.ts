@@ -305,6 +305,162 @@ function buildExistingMaterialOutput(text: string): Pick<SolutionResult, 'clarif
   };
 }
 
+function buildRefinedFinanceOutput(): SolutionResult {
+  return {
+    problemCore: {
+      summary: '你补充的信息说明，这份报表不只是自己整理数据，而是要给老板看，并且要能核对员工成本、公司流水和数据准确性。',
+      realBlocker: '真正卡住的是通用经营报表还不够贴近你的真实数据来源：员工数据、公司流水和准确性检查需要单独成表。',
+      whyItMatters: '老板看报表时最关心经营结果、异常原因和需要决策的问题。第二版要把这些内容提前整理出来。',
+    },
+    skillMatched: {
+      name: '工作流生成 Skill',
+      reason: '你补充了老板汇报、员工数据、公司流水、Excel 和数据准确性要求，所以需要把通用报表升级成可核对、可汇报的 Excel 工作流。',
+    },
+    clarifyingQuestions: [
+      '员工数据目前是工资表、考勤表，还是手工记录？',
+      '公司流水来自银行流水、收款平台，还是内部台账？',
+      '老板最关心利润、现金流，还是异常费用？',
+    ],
+    usableOutput: {
+      title: '第二版结果：老板版月度经营报表',
+      sections: [
+        {
+          heading: '1. 员工成本表',
+          content: '字段：员工姓名 / 部门 / 基础工资 / 绩效 / 社保 / 实发工资 / 备注\n用途：把人员相关成本单独拆出来，避免工资、社保、绩效混在费用总表里看不清。',
+        },
+        {
+          heading: '2. 公司流水核对表',
+          content: '字段：日期 / 流水来源 / 收入金额 / 支出金额 / 对应业务 / 是否已核对 / 异常说明\n用途：把报表收入和成本逐项对回公司流水，先解决“数据准不准”的问题。',
+        },
+        {
+          heading: '3. 数据准确性检查清单',
+          content: '收入总额是否和公司流水一致\n成本费用是否有凭证\n员工工资是否和实际发放一致\n异常金额是否单独标记\n现金流期末余额是否能对上账户余额',
+        },
+        {
+          heading: '4. 老板版汇报结构',
+          content: '本月经营结果\n收入和成本变化\n员工成本情况\n现金流风险\n需要老板决策的问题',
+        },
+        {
+          heading: '5. Excel 表结构提示',
+          content: '建议拆成 5 个 sheet：首页汇总 / 收入成本 / 员工成本 / 流水核对 / 异常说明。首页只放老板需要看的关键结论，明细放后面可追溯。',
+        },
+      ],
+    },
+    copyableTemplates: [
+      {
+        title: '员工成本表字段',
+        content: '| 字段名称 | 用途 | 示例 |\n| --- | --- | --- |\n| 员工姓名 | 标记成本归属 | 张三 |\n| 部门 | 看不同部门成本 | 销售部 |\n| 基础工资 | 固定人工成本 | 8000 |\n| 绩效 | 浮动人工成本 | 1200 |\n| 社保 | 公司承担部分 | 1500 |\n| 实发工资 | 实际支付金额 | 7600 |\n| 备注 | 异常或调整说明 | 补发上月绩效 |',
+      },
+      {
+        title: '公司流水核对表字段',
+        content: '| 字段名称 | 用途 | 示例 |\n| --- | --- | --- |\n| 日期 | 定位流水周期 | 2026-06-28 |\n| 流水来源 | 银行/平台/现金 | 对公银行 |\n| 收入金额 | 本笔流入 | 20000 |\n| 支出金额 | 本笔流出 | 5000 |\n| 对应业务 | 关联收入或费用项目 | 客户回款 |\n| 是否已核对 | 防止重复或漏记 | 是 |\n| 异常说明 | 单独解释不一致 | 未匹配发票 |',
+      },
+      {
+        title: '数据准确性检查清单',
+        content: '1. 收入总额是否和公司流水一致\n2. 成本费用是否有凭证\n3. 员工工资是否和实际发放一致\n4. 异常金额是否单独标记\n5. 现金流期末余额是否能对上账户余额',
+      },
+      {
+        title: '老板版汇报文案',
+        content: '本月经营结果整体为：收入 X，成本 X，毛利率 X%。\n收入较上月变化 X%，主要来自……\n员工成本本月为 X，占总成本 X%，其中异常变化是……\n公司流水已核对 X%，目前发现的主要差异是……\n下月建议老板重点决策：……',
+      },
+    ],
+    nextRefinementPrompt: '例如：老板最关心现金流，我的流水来自银行导出，员工工资表只有基础工资和实发工资。',
+    refinementSummary: '已根据你的补充，生成老板版报表、员工成本表、公司流水核对表、数据准确性检查清单和 Excel 表结构。',
+  };
+}
+
+function buildRefinedPortfolioOutput(): SolutionResult {
+  return {
+    problemCore: {
+      summary: '你补充的信息说明，这份作品集是用于求职，并且你已经有 4 个项目，当前最担心项目说明太空。',
+      realBlocker: '真正卡住的是项目排序和项目说明没有服务于招聘者判断：招聘者需要快速看懂你能解决什么问题，而不是只看视觉效果。',
+      whyItMatters: '求职作品集的第一轮判断很快，项目首页、项目说明和关键证据决定了别人是否愿意继续看。',
+    },
+    skillMatched: {
+      name: '材料生成 Skill',
+      reason: '你要把已有项目组织成求职材料，所以需要生成作品集结构、项目说明框架和面向招聘者的反馈问题。',
+    },
+    clarifyingQuestions: [
+      '目标岗位更偏品牌设计、视觉设计、UI，还是内容设计？',
+      '4 个项目里哪一个最接近目标岗位要求？',
+      '你已有的项目结果里，有没有真实反馈、数据或落地场景？',
+    ],
+    usableOutput: {
+      title: '第二版结果：求职版作品集结构',
+      sections: [
+        {
+          heading: '1. 求职版作品集结构',
+          content: '首页：一句话定位 + 3 个最能代表能力的项目\n项目 1：最贴近目标岗位的完整项目\n项目 2：体现方法和过程判断的项目\n项目 3：体现风格或执行能力的项目\n附录：其他练习、软件能力和补充作品',
+        },
+        {
+          heading: '2. 4 个项目的排序建议',
+          content: '先把 4 个项目按“岗位相关度 / 项目完整度 / 可证明能力 / 视觉完成度”打分。首页不要放最漂亮的项目，而要放最能证明你适合目标岗位的项目。',
+        },
+        {
+          heading: '3. 项目说明改写框架',
+          content: '每个项目说明按 5 行写：项目背景 / 真实问题 / 我的判断 / 我的解决方法 / 最终结果。先让招聘者看懂你解决了什么，再展示视觉。',
+        },
+        {
+          heading: '4. 面向招聘者的评审问题',
+          content: '请对方只看 3 件事：哪个项目最像真实工作？哪个项目说明最空？如果只能改一页，应该先改哪一页？',
+        },
+        {
+          heading: '5. 需要优先修改的页面类型',
+          content: '优先改项目首页、项目背景页、设计过程页、最终结果页。不要先花太多时间统一装饰风格，先把项目逻辑补清楚。',
+        },
+      ],
+    },
+    copyableTemplates: [
+      {
+        title: '求职版作品集目录',
+        content: '1. 个人定位：我适合什么岗位 / 能解决什么问题\n2. 项目一：最匹配目标岗位的完整项目\n3. 项目二：体现设计方法和判断过程\n4. 项目三：体现视觉执行和风格稳定性\n5. 补充页：软件能力、练习、其他作品',
+      },
+      {
+        title: '项目说明改写框架',
+        content: '项目背景：这个项目来自什么真实场景？\n真实问题：它要解决谁的什么问题？\n我的判断：我为什么这样设计？\n我的方法：我做了哪些调研、结构、视觉或测试？\n最终结果：交付了什么，产生了什么反馈或价值？',
+      },
+      {
+        title: '招聘者反馈消息模板',
+        content: '你好，我正在把作品集改成求职版本。现在有 4 个项目，最担心项目说明太空。想请你从招聘者角度直接指出：\n1. 哪个项目最像真实工作？\n2. 哪个项目说明最空？\n3. 如果只能先改一页，你建议我先改哪一页？',
+      },
+    ],
+    nextRefinementPrompt: '例如：目标岗位是品牌视觉设计，4 个项目里有 2 个品牌项目、1 个包装、1 个海报练习。',
+    refinementSummary: '已根据你的补充，生成求职版作品集结构、4 个项目排序建议、项目说明改写框架和招聘者反馈模板。',
+  };
+}
+
+export function buildRefinedSolutionResult(
+  profile: FutureProfile,
+  supplementText: string,
+  baseResult?: SolutionResult
+): SolutionResult {
+  const text = compactText([getProblemText(profile), supplementText]);
+
+  if (/(财务|经营报表|月度经营|报表|excel|表格|流水|员工|工资|老板|汇报|数据不准|数据不准确)/i.test(text)) {
+    return buildRefinedFinanceOutput();
+  }
+
+  if (/(作品集|设计|视觉|portfolio|项目说明|求职|招聘)/i.test(text)) {
+    return buildRefinedPortfolioOutput();
+  }
+
+  const base = baseResult || buildSolutionResult(profile);
+  return {
+    ...base,
+    usableOutput: {
+      title: `第二版结果：${base.usableOutput.title}`,
+      sections: [
+        ...base.usableOutput.sections,
+        {
+          heading: '根据补充信息调整',
+          content: `你补充了：${supplementText}\n下一版应优先围绕这条真实信息调整结构、模板和完成标准。`,
+        },
+      ],
+    },
+    refinementSummary: '已根据你的补充生成第二版结果。',
+  };
+}
+
 function buildGenericOutput(skillName: SolutionSkillName): Pick<SolutionResult, 'clarifyingQuestions' | 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'> {
   return {
     clarifyingQuestions: [
