@@ -1036,53 +1036,14 @@ function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
-          一、我理解你的核心问题
+          1. 我理解你的问题
         </div>
-        <h2 className="text-lg font-semibold leading-relaxed text-[#111827]">{result.problemCore.summary}</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl bg-[#F8FAFD] p-4">
-            <div className="text-xs font-semibold text-[#64748B]">真正卡住的是</div>
-            <p className="mt-2 text-sm leading-relaxed text-[#1F2937]">{result.problemCore.realBlocker}</p>
-          </div>
-          <div className="rounded-2xl bg-[#F8FAFD] p-4">
-            <div className="text-xs font-semibold text-[#64748B]">为什么重要</div>
-            <p className="mt-2 text-sm leading-relaxed text-[#1F2937]">{result.problemCore.whyItMatters}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
-        <div className="mb-3 inline-flex rounded-full bg-[#F3F7FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
-          二、本次匹配的 Skill
-        </div>
-        <div className="rounded-2xl bg-gradient-to-br from-[#F3F7FF] to-white p-4 ring-1 ring-[#E1ECFF]">
-          <div className="text-lg font-semibold text-[#111827]">{result.skillMatched.name}</div>
-          <p className="mt-2 text-sm leading-relaxed text-[#64748B]">{result.skillMatched.reason}</p>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
-        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          三、关键追问
-        </div>
-        <p className="mb-4 text-sm leading-relaxed text-[#64748B]">
-          这些问题会让成果更准确；即使暂时不回答，下面也先给你一版可用成果。
-        </p>
-        <div className="space-y-2">
-          {result.clarifyingQuestions.slice(0, 4).map((question, index) => (
-            <div key={question} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
-                {index + 1}
-              </div>
-              <p className="text-sm leading-relaxed text-[#1F2937]">{question}</p>
-            </div>
-          ))}
-        </div>
+        <p className="text-base font-semibold leading-relaxed text-[#111827]">{result.problemCore.summary}</p>
       </section>
 
       <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
-          四、先给你一版可用成果
+          2. 我先给你一版结果
         </div>
         <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
         <div className="mt-5 space-y-3">
@@ -1097,7 +1058,7 @@ function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          五、可直接复制 / 使用的内容
+          3. 可直接复制使用
         </div>
         <div className="space-y-3">
           {result.copyableTemplates.map(template => (
@@ -1118,7 +1079,23 @@ function SolutionWorkspaceCard({ result }: { result: SolutionResult }) {
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          六、继续完善
+          4. 想更准，只补充 3 个信息
+        </div>
+        <div className="space-y-2">
+          {result.clarifyingQuestions.slice(0, 3).map((question, index) => (
+            <div key={question} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
+                {index + 1}
+              </div>
+              <p className="text-sm leading-relaxed text-[#1F2937]">{question}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          5. 继续完善
         </div>
         <h2 className="text-lg font-semibold text-[#111827]">继续完善</h2>
         <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
@@ -1983,7 +1960,7 @@ export default function RadarPage() {
     );
   }
 
-  const solutionResult = radarData.solutionResult || buildSolutionResult(profile, radarData);
+  const solutionResult = buildSolutionResult(profile, radarData);
 
   // Solution Core v0.5 Step 1：解决工作台
   return (
