@@ -4,6 +4,9 @@ import type {
   SolutionResult,
   SolutionSkillName,
 } from '@/types/radar';
+import { buildOutputContract, type OutputContract } from './outputContract';
+import { buildProblemFrame, type OutputType, type ProblemFrame } from './problemFrameEngine';
+import { renderDeliverables } from './deliverableRenderer';
 
 function compactText(values: Array<string | undefined>): string {
   return values.filter(Boolean).join(' ').trim();
@@ -771,6 +774,77 @@ function buildGenericOutput(skillName: SolutionSkillName): Pick<SolutionResult, 
   };
 }
 
+function getSkillNameFromOutputType(outputType: OutputType): SolutionSkillName {
+  if (outputType === 'workflow' || outputType === 'table') return '工作流生成 Skill';
+  if (outputType === 'plan') return '学习路径 Skill';
+  if (outputType === 'document' || outputType === 'script' || outputType === 'message' || outputType === 'mixed') return '材料生成 Skill';
+  return '通用解决 Skill';
+}
+
+function formatDeliverableContent(deliverable: OutputContract['deliverables'][number]): string {
+  const rules = deliverable.contentRules.map(item => `- ${item}`).join('\n');
+  const sections = deliverable.suggestedSections.map(item => `- ${item}：`).join('\n');
+
+  return [
+    `用途：${deliverable.purpose}`,
+    '',
+    '内容规则：',
+    rules,
+    '',
+    '建议结构：',
+    sections,
+  ].join('\n');
+}
+
+function formatCopyableBlock(block: OutputContract['copyableBlocks'][number]): string {
+  if (block.type === 'table') {
+    return '| 字段 | 用途 | 示例 |\n| --- | --- | --- |\n|  |  |  |';
+  }
+
+  if (block.type === 'script') {
+    return '开头：\n展开：\n关键证据或内容：\n结尾行动：\n可替换变量：';
+  }
+
+  if (block.type === 'checklist') {
+    return '1. 目标是否清楚？\n2. 结构是否完整？\n3. 缺失信息是否已标记？\n4. 下一步是否能直接执行？';
+  }
+
+  if (block.type === 'outline') {
+    return '一、目标\n二、核心内容\n三、关键结构\n四、可替换部分\n五、下一步';
+  }
+
+  if (block.type === 'formula') {
+    return '输入项：\n处理逻辑：\n输出结果：\n异常说明：';
+  }
+
+  if (block.type === 'message') {
+    return '你好，我想请你看一下这版内容是否清楚。重点帮我判断：\n1. 目标是否一眼能看懂？\n2. 哪一部分最影响理解？\n3. 如果只能改一处，应该先改哪里？';
+  }
+
+  return '目标：\n已有信息：\n第一版内容：\n需要补充：\n下一步：';
+}
+
+function buildContractSolutionResult(problemFrame: ProblemFrame, outputContract: OutputContract): SolutionResult {
+  const skillName = getSkillNameFromOutputType(problemFrame.centerOutput.outputType);
+  const rendered = renderDeliverables(problemFrame, outputContract);
+
+  return {
+    problemCore: {
+      summary: `你想得到的是「${problemFrame.centerOutput.name}」，当前要先把它拆成可以交付的结构。`,
+      realBlocker: problemFrame.currentBlocker.reason,
+      whyItMatters: '先确定中心产出、输入材料和交付形态，FutureLens 才不会把你的问题误归入某个固定案例模板。',
+    },
+    skillMatched: {
+      name: skillName,
+      reason: `根据问题结构，这次需要生成 ${problemFrame.centerOutput.outputType} 类型的可用成果，而不是套用固定场景模板。`,
+    },
+    clarifyingQuestions: outputContract.clarificationQuestions.map(item => item.question),
+    usableOutput: rendered.usableOutput,
+    copyableTemplates: rendered.copyableTemplates,
+    nextRefinementPrompt: rendered.nextRefinementPrompt,
+  };
+}
+
 function buildOutputForIntent(
   profile: FutureProfile,
   intent: SolutionIntent,
@@ -800,6 +874,13 @@ export function buildSolutionResult(
   profile: FutureProfile,
   _radar?: Partial<OpportunityRadarV4>
 ): SolutionResult {
+  const problemFrame = buildProblemFrame(profile);
+  const outputContract = buildOutputContract(problemFrame);
+
+  if (outputContract.deliverables.length > 0) {
+    return buildContractSolutionResult(problemFrame, outputContract);
+  }
+
   const intent = resolveSolutionIntent(profile);
   const skillMatched = buildSkillMatched(intent);
   const problemCore = getProblemCore(profile, skillMatched.name);
