@@ -11,6 +11,7 @@ import { buildRefinedSolutionResult, buildSolutionResult } from '@/lib/solutionE
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
 import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
+import FutureLensLoading from '@/components/FutureLensLoading';
 
 type VerificationPhase = 'idle' | 'started' | 'recording' | 'recorded';
 type VerificationCategory = 'customer' | 'job' | 'study' | 'direction' | 'general';
@@ -1031,6 +1032,136 @@ function parseMarkdownTable(content: string) {
   );
 }
 
+function renderInlineMarkdown(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={`${part}-${index}`} className="font-semibold text-[#111827]">{part.slice(2, -2)}</strong>;
+    }
+
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
+function isMarkdownTableSeparator(line: string) {
+  return /^\|\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line.trim());
+}
+
+function renderMarkdownTable(tableLines: string[], key: string) {
+  const rows = parseMarkdownTable(tableLines.join('\n'));
+  if (rows.length === 0) return null;
+
+  const [headers, ...bodyRows] = rows;
+
+  return (
+    <div key={key} className="my-3 overflow-x-auto rounded-2xl bg-white ring-1 ring-[#E5EAF3]">
+      <table className="min-w-full text-left text-xs">
+        <thead className="bg-[#F8FAFD] text-[#64748B]">
+          <tr>
+            {headers.map((cell, index) => (
+              <th key={`${key}-head-${index}`} className="whitespace-nowrap px-3 py-2 font-semibold">
+                {renderInlineMarkdown(cell)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#EEF2F7] text-[#374151]">
+          {bodyRows.map((row, rowIndex) => (
+            <tr key={`${key}-row-${rowIndex}`}>
+              {row.map((cell, cellIndex) => (
+                <td key={`${key}-cell-${rowIndex}-${cellIndex}`} className="min-w-32 px-3 py-2 leading-relaxed align-top">
+                  {renderInlineMarkdown(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const blocks = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index].trim();
+
+    if (!line) {
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith('|') && lines[index + 1] && isMarkdownTableSeparator(lines[index + 1])) {
+      const tableLines = [lines[index], lines[index + 1]];
+      index += 2;
+
+      while (index < lines.length && lines[index].trim().startsWith('|')) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+
+      blocks.push(renderMarkdownTable(tableLines, `table-${index}`));
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      const items = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^\d+\.\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ol key={`ol-${index}`} className="my-3 list-decimal space-y-1 pl-5 text-sm leading-7 text-[#374151]">
+          {items.map((item, itemIndex) => <li key={`${item}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}
+        </ol>
+      );
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line) || /^-\s+\[[ xX]\]\s+/.test(line)) {
+      const items = [];
+      while (
+        index < lines.length &&
+        (/^[-*]\s+/.test(lines[index].trim()) || /^-\s+\[[ xX]\]\s+/.test(lines[index].trim()))
+      ) {
+        items.push(lines[index].trim().replace(/^[-*]\s+/, '').replace(/^\[[ xX]\]\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ul key={`ul-${index}`} className="my-3 list-disc space-y-1 pl-5 text-sm leading-7 text-[#374151]">
+          {items.map((item, itemIndex) => <li key={`${item}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+
+    const paragraph = [line];
+    index += 1;
+
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !lines[index].trim().startsWith('|') &&
+      !/^\d+\.\s+/.test(lines[index].trim()) &&
+      !/^[-*]\s+/.test(lines[index].trim()) &&
+      !/^-\s+\[[ xX]\]\s+/.test(lines[index].trim())
+    ) {
+      paragraph.push(lines[index].trim());
+      index += 1;
+    }
+
+    blocks.push(
+      <p key={`p-${index}`} className="my-2 whitespace-pre-wrap text-sm leading-7 text-[#374151]">
+        {renderInlineMarkdown(paragraph.join('\n'))}
+      </p>
+    );
+  }
+
+  return <div className="mt-2 space-y-2">{blocks}</div>;
+}
+
 function CopyableTemplateCard({ template }: { template: CopyableTemplate }) {
   const [copied, setCopied] = useState(false);
   const tableRows = parseMarkdownTable(template.content);
@@ -1142,7 +1273,7 @@ function RefinedResultCard({ result }: { result: SolutionResult }) {
         {result.usableOutput.sections.map(section => (
           <div key={section.heading} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
             <h3 className="text-sm font-semibold text-[#111827]">{section.heading}</h3>
-            <pre className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#374151]">{section.content}</pre>
+            <MarkdownContent content={section.content} />
           </div>
         ))}
       </div>
@@ -1219,10 +1350,8 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
           </div>
           <div>
             <p className="text-xs font-semibold text-[#2463EB]">Solution Workspace</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#111827]">解决工作台</h1>
-            <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
-              FutureLens 会先理解你的需求，再组织需要的能力，生成一版可以使用的成果。
-            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#111827]">{'\u4f60\u7684\u7b2c\u4e00\u7248\u89e3\u51b3\u65b9\u6848\u5df2\u751f\u6210'}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#64748B]">{'FutureLens \u5df2\u7406\u89e3\u4f60\u7684\u9700\u6c42\uff0c\u5e76\u7ec4\u7ec7\u6267\u884c\u5668\u751f\u6210\u53ef\u590d\u5236\u6210\u679c\u3002'}</p>
           </div>
         </div>
       </section>
@@ -1245,7 +1374,7 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
           {result.usableOutput.sections.map(section => (
             <div key={section.heading} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
               <h3 className="text-sm font-semibold text-[#111827]">{section.heading}</h3>
-              <pre className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#374151]">{section.content}</pre>
+              <MarkdownContent content={section.content} />
             </div>
           ))}
         </div>
@@ -2099,12 +2228,7 @@ export default function RadarPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-[#007AFF] animate-spin" />
-          <span className="text-sm text-[#6B7280]">正在加载...</span>
-        </div>
-      </div>
+      <FutureLensLoading />
     );
   }
 
