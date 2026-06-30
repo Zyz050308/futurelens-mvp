@@ -7,6 +7,7 @@ import type {
 import { buildOutputContract, type OutputContract } from './outputContract';
 import { buildProblemFrame, type OutputType, type ProblemFrame } from './problemFrameEngine';
 import { renderDeliverables } from './deliverableRenderer';
+import { runExecutorRuntime } from './executorRuntime';
 
 function compactText(values: Array<string | undefined>): string {
   return values.filter(Boolean).join(' ').trim();
@@ -775,10 +776,15 @@ function buildGenericOutput(skillName: SolutionSkillName): Pick<SolutionResult, 
 }
 
 function getSkillNameFromOutputType(outputType: OutputType): SolutionSkillName {
-  if (outputType === 'workflow' || outputType === 'table') return '工作流生成 Skill';
-  if (outputType === 'plan') return '学习路径 Skill';
-  if (outputType === 'document' || outputType === 'script' || outputType === 'message' || outputType === 'mixed') return '材料生成 Skill';
-  return '通用解决 Skill';
+  if (outputType === 'table') return '\u8868\u683c\u6210\u679c\u751f\u6210 Skill' as SolutionSkillName;
+  if (outputType === 'workflow') return '\u6d41\u7a0b\u751f\u6210 Skill' as SolutionSkillName;
+  if (outputType === 'plan') return '\u5b66\u4e60\u8def\u5f84 Skill' as SolutionSkillName;
+  if (outputType === 'document') return '\u6750\u6599\u751f\u6210 Skill' as SolutionSkillName;
+  if (outputType === 'script') return '\u5185\u5bb9\u811a\u672c\u751f\u6210 Skill' as SolutionSkillName;
+  if (outputType === 'checklist') return '\u68c0\u67e5\u6e05\u5355\u751f\u6210 Skill' as SolutionSkillName;
+  if (outputType === 'message') return '\u6750\u6599\u751f\u6210 Skill' as SolutionSkillName;
+  if (outputType === 'mixed') return '\u7efc\u5408\u6210\u679c\u751f\u6210 Skill' as SolutionSkillName;
+  return '\u901a\u7528\u89e3\u51b3 Skill' as SolutionSkillName;
 }
 
 function formatDeliverableContent(deliverable: OutputContract['deliverables'][number]): string {
@@ -824,9 +830,16 @@ function formatCopyableBlock(block: OutputContract['copyableBlocks'][number]): s
   return '目标：\n已有信息：\n第一版内容：\n需要补充：\n下一步：';
 }
 
-function buildContractSolutionResult(problemFrame: ProblemFrame, outputContract: OutputContract): SolutionResult {
+function buildContractSolutionResult(
+  profile: FutureProfile,
+  problemFrame: ProblemFrame,
+  outputContract: OutputContract
+): SolutionResult {
   const skillName = getSkillNameFromOutputType(problemFrame.centerOutput.outputType);
-  const rendered = renderDeliverables(problemFrame, outputContract);
+  const runtime = runExecutorRuntime({ profile, frame: problemFrame, contract: outputContract });
+  const rendered = runtime.status === 'completed'
+    ? runtime.composedResult
+    : renderDeliverables(problemFrame, outputContract);
 
   return {
     problemCore: {
@@ -878,7 +891,7 @@ export function buildSolutionResult(
   const outputContract = buildOutputContract(problemFrame);
 
   if (outputContract.deliverables.length > 0) {
-    return buildContractSolutionResult(problemFrame, outputContract);
+    return buildContractSolutionResult(profile, problemFrame, outputContract);
   }
 
   const intent = resolveSolutionIntent(profile);
