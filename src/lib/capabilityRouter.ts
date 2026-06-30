@@ -226,7 +226,7 @@ function createExecutors(ids: SolutionExecutorId[]): CapabilityPlan['recommended
 }
 
 function isExistingMaterialRequest(text: string): boolean {
-  const explicit = /(这是我的简历|这是我的作品集|这是我的作品集说明|这是我的文案|帮我分析这段|帮我修改这段|帮我改这份|下面是我的|以下是我的)/i.test(text);
+  const explicit = /(这是我的|下面是我的|以下是我的|我有一份|已有一份|有一份).*(简历|作品集|文案|材料|说明|报告|计划|草稿)|帮我(分析|修改|改|看看).*(这段|这份|材料|草稿)/i.test(text);
   const longMaterial = text.length > 180 && /(简历|作品集|项目经历|自我介绍|求职|申请|文案|材料)/i.test(text);
   return explicit || longMaterial;
 }
@@ -267,8 +267,8 @@ export function routeCapabilities(problemText: string): CapabilityPlan {
       demandSummary: '用户需要完成短视频选题、脚本、分镜和生成准备。',
       taskDecomposition: ['确定视频目标', '生成脚本结构', '拆分分镜', '生成画面提示词', '标记后续视频生成能力'],
       requiredCapabilities: createCapabilities(
-        ['script_generation', 'storyboard_generation', 'visual_prompting', 'video_generation'],
-        '把短视频想法变成脚本、分镜和可交给生成工具的画面提示'
+        ['script_generation', 'storyboard_generation', 'visual_prompting', 'video_generation', 'workflow_design'],
+        '把短视频想法变成脚本、分镜、素材包和可复用的短视频生产工作流'
       ),
       recommendedExecutors: createExecutors(['LLM_REASONING', 'VISUAL_PROMPTING', 'VIDEO_GENERATION_MODEL']),
       executionSteps: ['先确定视频主题和受众', '生成 30-60 秒脚本', '拆成 4-6 个镜头', '输出每个镜头的画面提示词', '整理成后续可继续生成画面的素材包'],

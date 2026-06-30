@@ -448,7 +448,7 @@ export default function ProfilePage() {
               <textarea
                 value={profile.currentSituation}
                 onChange={(event) => handleChange('currentSituation', event.target.value)}
-                placeholder="例如：我有一份作品集，不知道应该先改版式还是项目说明。"
+                placeholder="说清楚：你想完成什么，现在卡在哪一步。不需要写完整材料。"
                 rows={6}
                 className="w-full resize-none rounded-[22px] border border-[#DDE4F0] bg-[#FBFCFF] px-5 py-4 text-base leading-7 text-[#111827] outline-none transition placeholder:text-[#A7B0BE] focus:border-[#007AFF] focus:ring-4 focus:ring-[#007AFF]/10"
               />
@@ -467,13 +467,11 @@ export default function ProfilePage() {
                     className={selectClass}
                   >
                     <option value="">可以先不选</option>
-                    <option value="改好材料">改好材料</option>
-                    <option value="找到工作">找到工作</option>
-                    <option value="提高效率">提高效率</option>
-                    <option value="准备考试">准备考试</option>
-                    <option value="做出选择">做出选择</option>
-                    <option value="验证副业">验证副业</option>
-                    <option value="学习能力">学习能力</option>
+                    <option value="一版可复制的方案">一版可复制的方案</option>
+                    <option value="模板 / 表格 / 清单">模板 / 表格 / 清单</option>
+                    <option value="流程 / SOP">流程 / SOP</option>
+                    <option value="文案 / 脚本">文案 / 脚本</option>
+                    <option value="先判断该做什么">先判断该做什么</option>
                   </select>
                 </FieldShell>
 
@@ -481,7 +479,7 @@ export default function ProfilePage() {
                   <textarea
                     value={profile.currentGoal}
                     onChange={(event) => handleChange('currentGoal', event.target.value)}
-                    placeholder="例如：想先知道简历最该改哪一段，或者作品集项目说明怎么写得更清楚。"
+                    placeholder="补充目标、对象、时间、风格、限制，或者你希望这次推进到哪一步。不确定也可以空着。"
                     rows={3}
                     className={textareaClass}
                   />
@@ -491,7 +489,7 @@ export default function ProfilePage() {
                   <textarea
                     value={profile.currentSkills}
                     onChange={(event) => handleChange('currentSkills', event.target.value)}
-                    placeholder="例如：我有一份简历，但还没整理好项目经历。"
+                    placeholder="说明你已有的材料类型：文字、表格、图片、参考案例、数据、草稿。没有也可以空着。"
                     rows={3}
                     className={textareaClass}
                   />
@@ -509,7 +507,7 @@ export default function ProfilePage() {
                   <textarea
                     value={profile.currentAnxiety}
                     onChange={(event) => handleChange('currentAnxiety', event.target.value)}
-                    placeholder="例如：怕改了很久还是不专业，或者不知道自己到底差在哪里。"
+                    placeholder="说明你最担心的阻碍：不够具体、不够专业、时间不够、信息不全、结果不能直接用。"
                     rows={3}
                     className={textareaClass}
                   />

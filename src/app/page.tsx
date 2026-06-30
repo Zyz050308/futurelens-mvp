@@ -369,7 +369,7 @@ export default function HomePage() {
                   <input
                     value={concern}
                     onChange={(event) => setConcern(event.target.value)}
-                    placeholder="例如：我有一份材料，不知道怎么改"
+                    placeholder="用一句话说出你现在卡住的事：你想完成什么，但不知道怎么开始 / 怎么做 / 怎么改。"
                     className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-[#172540] outline-none placeholder:text-slate-300"
                   />
                 </label>
@@ -382,7 +382,7 @@ export default function HomePage() {
                 </button>
               </form>
               <p className="mt-2 text-[11px] text-[#A8B1C0]">
-                也可以是：汇报、作品集、学习计划、工作流程
+                说清楚目标、卡点、已有材料和限制就可以。
               </p>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-[#7B879B]">

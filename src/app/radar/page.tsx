@@ -1729,6 +1729,10 @@ function getProfileProblemText(profile: FutureProfile): string {
   ].filter(Boolean).join(' ').trim();
 }
 
+function getProfilePrimaryProblemText(profile: FutureProfile): string {
+  return profile.currentSituation?.trim() || getProfileProblemText(profile);
+}
+
 export default function RadarPage() {
   const [profile, setProfile] = useState<FutureProfile | null>(null);
   const [radarData, setRadarData] = useState<OpportunityRadarV4 | null>(null);
@@ -2158,7 +2162,7 @@ export default function RadarPage() {
   }
 
   const solutionResult = buildSolutionResult(profile, radarData);
-  const capabilityPlan = routeCapabilities(getProfileProblemText(profile));
+  const capabilityPlan = routeCapabilities(getProfilePrimaryProblemText(profile));
 
   // Solution Core v0.5 Step 1：解决工作台
   return (

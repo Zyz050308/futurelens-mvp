@@ -20,9 +20,23 @@ function getProblemText(profile: FutureProfile): string {
   ]);
 }
 
+function getPrimaryProblemText(profile: FutureProfile): string {
+  return profile.currentSituation?.trim() || getProblemText(profile);
+}
+
+type SolutionIntent =
+  | 'finance'
+  | 'video'
+  | 'portfolio'
+  | 'existing_material'
+  | 'material_output'
+  | 'workflow'
+  | 'learning'
+  | 'generic';
+
 function isExistingMaterialInput(text: string): boolean {
   const hasExplicitExistingSignal =
-    /(这是我的简历|这是我的作品集|这是我的作品集说明|这是我的文案|帮我分析这段|帮我修改这段|帮我改这份|下面是我的|以下是我的)/i.test(text);
+    /(这是我的|下面是我的|以下是我的|我有一份|已有一份|有一份).*(简历|作品集|文案|材料|说明|报告|计划|草稿)|帮我(分析|修改|改|看看).*(这段|这份|材料|草稿)/i.test(text);
   const hasMaterialKeyword =
     /(简历|作品集|作品集说明|项目经历|自我介绍|求职|申请|文案|个人陈述|ps|项目介绍|材料)/i.test(text);
   const isLongMaterial = text.length > 180 && hasMaterialKeyword;
@@ -30,7 +44,35 @@ function isExistingMaterialInput(text: string): boolean {
   return hasExplicitExistingSignal || isLongMaterial;
 }
 
+function resolveSolutionIntent(profile: FutureProfile): SolutionIntent {
+  const primary = getPrimaryProblemText(profile);
+  const full = getProblemText(profile);
+
+  if (isExistingMaterialInput(primary) || isExistingMaterialInput(full)) return 'existing_material';
+  if (/(财务|经营报表|月度经营|报表|excel|表格)/i.test(primary)) return 'finance';
+  if (/(短视频|推广视频|视频方案|视频模板|视频模版|视频脚本|分镜|拍摄|剪辑|口播|画面提示词)/i.test(primary)) return 'video';
+  if (/(作品集|portfolio)/i.test(primary)) return 'portfolio';
+  if (/(材料|文案|说明|申请|汇报稿|商业计划书|bp|介绍|讲稿|邮件|模板|模版|页面|清单|报告)/i.test(primary)) return 'material_output';
+  if (/(流程很乱|工作流程很乱|每天先做什么|工作安排混乱|任务很乱|不知道.*优先级)/i.test(primary)) return 'workflow';
+  if (/(学习|备考|雅思|托福|技能|转行|路线|计划|复习|练习|课程)/i.test(primary)) return 'learning';
+
+  if (/(财务|经营报表|月度经营|报表|excel|表格)/i.test(full)) return 'finance';
+  if (/(短视频|推广视频|视频方案|视频模板|视频模版|视频脚本|分镜|拍摄|剪辑|口播|画面提示词)/i.test(full)) return 'video';
+  if (/(作品集|portfolio)/i.test(full)) return 'portfolio';
+  if (/(流程很乱|工作流程很乱|每天先做什么|工作安排混乱|任务很乱|不知道.*优先级)/i.test(full)) return 'workflow';
+  if (/(学习|备考|雅思|托福|技能|转行|路线|计划|复习|练习|课程)/i.test(full)) return 'learning';
+
+  return 'generic';
+}
+
 function matchSkill(text: string): SolutionResult['skillMatched'] {
+  if (/(短视频|推广视频|视频方案|视频模板|视频模版|视频脚本|分镜|拍摄|剪辑|口播|画面提示词)/i.test(text)) {
+    return {
+      name: '材料生成 Skill',
+      reason: '这个问题的核心是产出一套可复用的视频方案、脚本、分镜和素材组织方式。',
+    };
+  }
+
   if (/(作品集|设计|视觉|portfolio)/i.test(text)) {
     return {
       name: '材料生成 Skill',
@@ -65,18 +107,56 @@ function matchSkill(text: string): SolutionResult['skillMatched'] {
   };
 }
 
+function buildSkillMatched(intent: SolutionIntent): SolutionResult['skillMatched'] {
+  if (intent === 'finance' || intent === 'workflow') {
+    return {
+      name: '工作流生成 Skill',
+      reason: intent === 'finance'
+        ? '这个问题需要把数据字段、计算公式、检查标准和汇报结构固定下来，形成可复用的报表工作流。'
+        : '这个问题需要先把入口、优先级、执行步骤和可复用节点固定下来，而不是继续堆待办事项。',
+    };
+  }
+
+  if (intent === 'learning') {
+    return {
+      name: '学习路径 Skill',
+      reason: '这个问题需要把目标拆成训练路径、今日练习和复盘方式，避免停留在“继续学习”。',
+    };
+  }
+
+  if (intent === 'video') {
+    return {
+      name: '材料生成 Skill',
+      reason: '这个问题的核心是产出一套可复用的视频方案、脚本、分镜和素材组织方式。',
+    };
+  }
+
+  if (intent === 'portfolio' || intent === 'existing_material' || intent === 'material_output') {
+    return {
+      name: '材料生成 Skill',
+      reason: '这个问题的核心是产出一份能直接修改或交付的材料，需要先给出结构、模板和可复制文本。',
+    };
+  }
+
+  return {
+    name: '通用解决 Skill',
+    reason: '当前问题还没有明显落到工作流、材料或学习路径上，所以先用通用结构把问题拆成可执行版本。',
+  };
+}
+
 function getProblemCore(profile: FutureProfile, skillName: SolutionSkillName): SolutionResult['problemCore'] {
   const text = getProblemText(profile);
+  const intent = resolveSolutionIntent(profile);
 
-  if (isExistingMaterialInput(text)) {
+  if (intent === 'existing_material') {
     return {
-      summary: '你已经有一份材料，现在需要先看清它哪里影响判断，再改出一版更清楚的表达。',
+      summary: '你已经有一份材料，现在需要先看清它的用途、对象和卡点，再改出一版更清楚的表达。',
       realBlocker: '真正卡住的是材料里的重点、证据和目标关联还不够清楚，所以别人很难快速判断你的能力或匹配度。',
       whyItMatters: '先找出材料问题，再给出可替换片段，比从头重写更快，也更容易保留你的真实经历。',
     };
   }
 
-  if (/(财务|经营报表|月度经营|报表|excel|表格)/i.test(text)) {
+  if (intent === 'finance') {
     return {
       summary: '你想做一份财务报表，但目前不确定报表结构、字段、公式和汇报方式。',
       realBlocker: '真正卡住的是报表结构、关键字段、公式口径和汇报逻辑没有先定下来，所以每次做表都会从零开始。',
@@ -84,7 +164,15 @@ function getProblemCore(profile: FutureProfile, skillName: SolutionSkillName): S
     };
   }
 
-  if (/(作品集|设计|视觉|portfolio)/i.test(text)) {
+  if (intent === 'video') {
+    return {
+      summary: '你想完成一个视频方案或模板，核心不是先学习方法，而是拆解参考结构、生成自己的脚本/分镜模板，并形成可复用的生产流程。',
+      realBlocker: '真正卡住的是中心产出还没有被拆成“参考拆解、模板结构、素材组织、生产步骤”几个可执行部分。',
+      whyItMatters: '只要先生成一版可复用模板和工作流，你后面就能基于素材继续调整，而不是每次从零想创意。',
+    };
+  }
+
+  if (intent === 'portfolio') {
     return {
       summary: '你想准备作品集，同时用 AI 提高效率，但目前不确定应该先改结构、文案、项目逻辑还是视觉呈现。',
       realBlocker: '如果没有先确定作品集的使用场景和评审标准，就很容易一直改视觉效果，却没有提高作品集的判断力和说服力。',
@@ -92,15 +180,15 @@ function getProblemCore(profile: FutureProfile, skillName: SolutionSkillName): S
     };
   }
 
-  if (/(简历|申请材料|个人陈述|ps|介绍|讲稿|邮件|文案)/i.test(text)) {
+  if (intent === 'material_output') {
     return {
-      summary: '你不是缺少更多表达，而是还没有把材料要证明什么、给谁看、用什么证据证明说清楚。',
-      realBlocker: '材料如果只有经历或描述，没有目标对象、判断过程和结果证据，就很难让别人快速相信它有用。',
-      whyItMatters: '先把材料结构固定下来，再补细节，才不会陷入反复润色但不知道有没有变好的状态。',
+      summary: '你想完成一份可用材料，当前需要先明确它给谁看、要达成什么效果，以及第一版应该包含哪些结构。',
+      realBlocker: '真正卡住的是材料的目标对象、结构和完成标准还不清楚，所以很难判断应该先改内容、表达还是格式。',
+      whyItMatters: '先生成通用修改框架，再根据用途继续细化，比默认套用某个具体案例更稳。',
     };
   }
 
-  if (/(雅思|托福|备考|复习|练习|学习|技能)/i.test(text)) {
+  if (intent === 'learning') {
     return {
       summary: '你真正卡住的不是找不到学习方法，而是不知道今天该练哪一个最小环节，以及练完如何判断有效。',
       realBlocker: '目标太大时，学习会变成收藏资料和换计划。你需要一套今天就能执行、能留下结果的训练单位。',
@@ -108,19 +196,11 @@ function getProblemCore(profile: FutureProfile, skillName: SolutionSkillName): S
     };
   }
 
-  if (/(流程|工作流|每天先做什么|优先级|效率|sop|自动化|项目管理)/i.test(text)) {
+  if (intent === 'workflow') {
     return {
       summary: '你现在需要的不是更多待办事项，而是把混乱工作拆成固定入口、优先级和每天可重复执行的流程。',
       realBlocker: '真正卡住的是任务没有被分层：哪些必须今天做、哪些可以模板化、哪些可以自动化，还没有被区分出来。',
       whyItMatters: '先固定工作流，后面才知道该用什么工具、哪些节点值得自动化，而不是每天重新判断先做什么。',
-    };
-  }
-
-  if (/(短视频|视频方案|视频脚本|分镜|拍摄|剪辑|口播)/i.test(text)) {
-    return {
-      summary: '你想做一个短视频方案，当前需要先把选题、脚本、分镜和画面提示词组织成一版可执行方案。',
-      realBlocker: '真正卡住的不是缺一个灵感，而是还没有把视频拆成开头钩子、信息结构、镜头画面和生成准备。',
-      whyItMatters: '短视频如果只停在想法，会很难拍或生成。先给出脚本和分镜，后续才能继续进入拍摄、剪辑或画面生成流程。',
     };
   }
 
@@ -308,61 +388,76 @@ function buildVideoOutput(): Pick<SolutionResult, 'clarifyingQuestions' | 'usabl
       '你想真人出镜、图文混剪，还是 AI 生成画面？',
     ],
     usableOutput: {
-      title: '短视频方案第一版',
+      title: '短视频参考模板拆解与个人模板方案',
       sections: [
         {
-          heading: '1. 视频选题',
-          content: '选题：用一个真实问题开头，展示“问题 → 误区 → 可执行方法”。\n示例标题：普通人怎么把一个模糊想法变成今天能做的计划？',
+          heading: '1. 参考短视频模板拆解表',
+          content: '字段：环节 / 时长 / 画面内容 / 字幕或口播 / 镜头类型 / 节奏 / 可替换元素 / 我的版本怎么改。\n先把你想仿照的参考视频拆成结构，不直接照抄内容，只保留节奏、镜头组织和表达方式。',
         },
         {
-          heading: '2. 60 秒脚本',
-          content: '0-5 秒：说出痛点，引发代入\n5-20 秒：指出常见误区\n20-45 秒：给出 3 步方法\n45-60 秒：展示结果，并引导观众带着自己的问题尝试',
+          heading: '2. 我的短视频脚本模板',
+          content: '开头 3 秒：说出目标用户正在遇到的具体问题。\n中段展开：用 2-3 个步骤、画面证据或反差解释你的内容。\n画面展示：放入已有素材、补拍画面或 AI 生成画面。\n结尾行动：告诉观众下一步做什么。\n可替换变量：目标人群 / 场景 / 结果 / 证据 / 行动。',
         },
         {
           heading: '3. 分镜结构',
-          content: '镜头 1：人物正面说出问题\n镜头 2：屏幕展示混乱信息\n镜头 3：画面切到三步流程\n镜头 4：展示生成出的清单或模板\n镜头 5：结尾给出行动提示',
+          content: '字段：镜头编号 / 画面 / 口播或字幕 / 素材需求 / 备注。\n镜头 1：问题场景\n镜头 2：参考模板里的关键节奏\n镜头 3：自己的素材或产品出现\n镜头 4：核心卖点或方法拆解\n镜头 5：结果展示\n镜头 6：结尾行动提示',
         },
         {
-          heading: '4. 画面提示词',
-          content: '浅色桌面、笔记本电脑、干净 UI、蓝白科技感、真实工作场景、镜头缓慢推进、画面清晰克制。',
+          heading: '4. 素材准备清单',
+          content: '已有素材：先列出你手上已经有的短视频素材。\n需要补拍 / 补找素材：按镜头编号补齐缺口。\n可用 AI 生成素材：适合用来补背景、转场、氛围画面。\n素材命名规则：镜头编号_用途_版本，例如 01_开头问题_v1。',
         },
         {
-          heading: '5. 画面生成准备',
-          content: '先把脚本、分镜和画面提示词整理成统一素材包。下一步可以继续细化镜头风格、人物动作、场景道具和画面节奏。',
+          heading: '5. 短视频生产工作流',
+          content: '找参考视频 → 拆解模板 → 提取结构 → 替换成自己的内容 → 生成分镜 → 整理素材 → 拍摄 / 生成画面 → 剪辑 → 复盘 → 更新模板库。',
         },
       ],
     },
     copyableTemplates: [
       {
-        title: '短视频脚本模板',
-        content: '开头痛点：\n常见误区：\n三步方法：\n展示结果：\n结尾行动：',
+        title: '短视频模板拆解表',
+        content: '| 环节 | 时长 | 画面内容 | 字幕 / 口播 | 镜头类型 | 节奏 | 可替换元素 | 我的版本怎么改 |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| 开头 | 0-3秒 |  |  |  |  |  |  |\n| 展开 | 3-20秒 |  |  |  |  |  |  |\n| 证明 | 20-45秒 |  |  |  |  |  |  |\n| 结尾 | 45-60秒 |  |  |  |  |  |  |',
+      },
+      {
+        title: '30-60 秒脚本模板',
+        content: '开头 3 秒：\n中段展开：\n画面展示：\n结尾行动：\n可替换变量：目标人群 / 场景 / 结果 / 证据 / 行动',
       },
       {
         title: '分镜表',
-        content: '| 镜头 | 画面 | 旁白 | 时长 | 备注 |\n| --- | --- | --- | --- | --- |\n| 1 |  |  |  |  |',
+        content: '| 镜头编号 | 画面 | 口播 / 字幕 | 素材需求 | 备注 |\n| --- | --- | --- | --- | --- |\n| 1 |  |  |  |  |\n| 2 |  |  |  |  |\n| 3 |  |  |  |  |',
       },
       {
-        title: '画面提示词',
-        content: '浅色桌面，蓝白科技感，真实工作场景，笔记本电脑显示干净产品界面，柔和自然光，镜头缓慢推进，画面正式可信。',
+        title: '素材清单',
+        content: '已有素材：\n需要补拍 / 补找素材：\n可用 AI 生成素材：\n素材命名规则：镜头编号_用途_版本',
+      },
+      {
+        title: '短视频生产 SOP',
+        content: '1. 找参考视频\n2. 拆解模板\n3. 提取结构\n4. 替换成自己的内容\n5. 生成分镜\n6. 整理素材\n7. 拍摄 / 生成画面\n8. 剪辑\n9. 复盘\n10. 更新模板库',
       },
     ],
-    nextRefinementPrompt: '例如：这是给小红书看的，我想真人口播，主题是用 AI 提高工作效率。',
+    nextRefinementPrompt: '例如：我有 3 条参考视频，想仿照它们的结构，但换成我自己的内容和素材。',
   };
 }
 
 function buildExistingMaterialOutput(text: string): Pick<SolutionResult, 'clarifyingQuestions' | 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'> {
   const isPortfolio = /(作品集|作品集说明|项目介绍|portfolio)/i.test(text);
-  const title = isPortfolio ? '作品集材料修改建议' : '简历 / 材料修改建议';
+  const isResume = /(简历|求职|岗位|投递)/i.test(text);
+  const title = isPortfolio ? '作品集材料修改建议' : isResume ? '简历 / 材料修改建议' : '通用材料修改框架';
   const questions = isPortfolio
     ? [
         '作品集用于求职、考研、课程评审还是申请？',
         '你最想突出哪个项目？',
         '你希望我优先改结构、文案还是项目逻辑？',
       ]
+    : isResume
+      ? [
+          '这份简历投递什么岗位？',
+          '你最想突出哪段经历？',
+          '你有没有量化结果可以补充？',
+        ]
     : [
-        '这份简历投递什么岗位？',
-        '你最想突出哪段经历？',
-        '你有没有量化结果可以补充？',
+        '这份材料最终给谁看？',
+        '你希望它帮你完成什么结果？',
+        '你现在最不确定的是结构、内容、表达，还是可信度？',
       ];
 
   return {
@@ -416,7 +511,9 @@ function buildExistingMaterialOutput(text: string): Pick<SolutionResult, 'clarif
     ],
     nextRefinementPrompt: isPortfolio
       ? '例如：这份作品集用于求职，我最想突出品牌设计项目，希望先改项目说明。'
-      : '例如：这份简历投递视觉设计岗位，我最想突出一个品牌项目，但没有量化结果。',
+      : isResume
+        ? '例如：这份简历投递视觉设计岗位，我最想突出一个品牌项目，但没有量化结果。'
+        : '例如：这份材料是给对方判断方案是否可行，我最担心结构不清楚、结果不够具体。',
   };
 }
 
@@ -544,18 +641,91 @@ function buildRefinedPortfolioOutput(): SolutionResult {
   };
 }
 
+function buildRefinedVideoOutput(): SolutionResult {
+  return {
+    problemCore: {
+      summary: '你补充的信息说明，这次不是要一个泛泛的视频建议，而是要一套可以照着做的短视频模板和步骤，并且要把已有素材整理进生产流程。',
+      realBlocker: '真正卡住的是参考视频、已有素材、脚本结构、分镜和剪辑步骤还没有被串成一条可复用流程，所以很容易变成“知道要做视频，但不知道下一步怎么落地”。',
+      whyItMatters: '第二版要把参考拆解、素材整理、模板生成和成片检查连起来，让你能直接拿素材进入制作，而不是回到学习方法或每日工作流。',
+    },
+    skillMatched: {
+      name: '材料生成 Skill',
+      reason: '你需要的是短视频模板、脚本、分镜、素材表和生产 SOP 的组合成果，而不是泛工作流安排。',
+    },
+    clarifyingQuestions: [
+      '你准备仿照的参考视频属于口播、混剪、剧情，还是产品展示？',
+      '已有素材里哪些可以直接用，哪些还需要补拍或用 AI 补画面？',
+      '你希望第一条视频控制在 30 秒、45 秒，还是 60 秒？',
+    ],
+    usableOutput: {
+      title: '第二版结果：短视频模板生成工作流',
+      sections: [
+        {
+          heading: '1. 参考视频拆解步骤',
+          content: '先选 3 条最接近目标风格的参考视频。每条只拆结构：开头如何抓注意力、中段如何展开、画面如何切换、结尾如何引导行动。不要先评价好不好看，先把可复用结构拆出来。',
+        },
+        {
+          heading: '2. 素材整理表',
+          content: '字段：素材名称 / 类型 / 对应镜头 / 是否可直接使用 / 需要补拍或 AI 生成 / 备注。\n把“短视频素材”先按镜头用途分类：开头问题、过程展示、结果证明、转场、结尾行动。',
+        },
+        {
+          heading: '3. 自己模板生成流程',
+          content: '参考结构 → 替换目标人群 → 替换问题场景 → 放入自己的素材 → 写 30-60 秒脚本 → 拆成镜头 → 标记缺失素材 → 生成第一版剪辑清单。',
+        },
+        {
+          heading: '4. 镜头替换规则',
+          content: '参考视频的“画面形式”可以借鉴，但内容必须替换成自己的场景。\n人物镜头可替换为：产品画面 / 操作过程 / 截图演示 / AI 生成背景。\n口播可替换为：字幕卡 / 屏幕录制 / 前后对比。',
+        },
+        {
+          heading: '5. 成片检查清单',
+          content: '开头 3 秒是否说清目标问题？\n每个镜头是否对应一个信息点？\n素材命名是否能追溯到镜头？\n结尾是否有明确行动？\n这条视频能否作为下一条视频的模板继续复用？',
+        },
+      ],
+    },
+    copyableTemplates: [
+      {
+        title: '参考视频拆解步骤',
+        content: '1. 选 3 条参考视频\n2. 记录每条视频的开头、中段、结尾\n3. 标记画面节奏和转场方式\n4. 提取可复用结构\n5. 写出自己的替换版本',
+      },
+      {
+        title: '素材整理表',
+        content: '| 素材名称 | 类型 | 对应镜头 | 是否可直接使用 | 需要补拍 / AI 生成 | 备注 |\n| --- | --- | --- | --- | --- | --- |\n|  |  |  |  |  |  |',
+      },
+      {
+        title: '自己的模板生成流程',
+        content: '参考结构：\n目标人群：\n问题场景：\n已有素材：\n脚本第一版：\n分镜第一版：\n缺失素材：\n剪辑顺序：',
+      },
+      {
+        title: '镜头替换规则',
+        content: '参考镜头：\n我自己的替换画面：\n替换理由：\n需要的素材：\n是否可用 AI 补充：',
+      },
+      {
+        title: '成片检查清单',
+        content: '1. 开头 3 秒是否明确？\n2. 中段是否只有一个主线？\n3. 素材是否和脚本匹配？\n4. 结尾行动是否清楚？\n5. 这条视频结构是否能复用？',
+      },
+    ],
+    nextRefinementPrompt: '例如：参考视频是口播混剪，我手上有 8 段素材，想先做一条 45 秒版本。',
+    refinementSummary: '已根据你的补充，生成短视频模板第二版，包括参考拆解、素材整理、模板生成流程、镜头替换规则和成片检查清单。',
+  };
+}
+
 export function buildRefinedSolutionResult(
   profile: FutureProfile,
   supplementText: string,
   baseResult?: SolutionResult
 ): SolutionResult {
+  const intent = resolveSolutionIntent(profile);
   const text = compactText([getProblemText(profile), supplementText]);
 
-  if (/(财务|经营报表|月度经营|报表|excel|表格|流水|员工|工资|老板|汇报|数据不准|数据不准确)/i.test(text)) {
+  if (intent === 'finance' || (intent === 'generic' && /(财务|经营报表|月度经营|报表|excel|表格|流水|员工|工资|老板|汇报|数据不准|数据不准确)/i.test(text))) {
     return buildRefinedFinanceOutput();
   }
 
-  if (/(作品集|设计|视觉|portfolio|项目说明|求职|招聘)/i.test(text)) {
+  if (intent === 'video') {
+    return buildRefinedVideoOutput();
+  }
+
+  if (intent === 'portfolio' || (intent === 'generic' && /(作品集|设计|视觉|portfolio|项目说明|求职|招聘)/i.test(text))) {
     return buildRefinedPortfolioOutput();
   }
 
@@ -601,27 +771,39 @@ function buildGenericOutput(skillName: SolutionSkillName): Pick<SolutionResult, 
   };
 }
 
+function buildOutputForIntent(
+  profile: FutureProfile,
+  intent: SolutionIntent,
+  skillName: SolutionSkillName
+): Pick<SolutionResult, 'clarifyingQuestions' | 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'> {
+  switch (intent) {
+    case 'existing_material':
+      return buildExistingMaterialOutput(getProblemText(profile));
+    case 'finance':
+      return buildFinanceReportOutput();
+    case 'video':
+      return buildVideoOutput();
+    case 'portfolio':
+      return buildPortfolioOutput();
+    case 'workflow':
+      return buildWorkflowOutput();
+    case 'learning':
+      return buildLearningOutput();
+    case 'material_output':
+    case 'generic':
+    default:
+      return buildGenericOutput(skillName);
+  }
+}
+
 export function buildSolutionResult(
   profile: FutureProfile,
   _radar?: Partial<OpportunityRadarV4>
 ): SolutionResult {
-  const text = getProblemText(profile);
-  const skillMatched = matchSkill(text);
+  const intent = resolveSolutionIntent(profile);
+  const skillMatched = buildSkillMatched(intent);
   const problemCore = getProblemCore(profile, skillMatched.name);
-  const output =
-    isExistingMaterialInput(text)
-      ? buildExistingMaterialOutput(text)
-      : /(财务|经营报表|月度经营|报表|excel|表格)/i.test(text)
-      ? buildFinanceReportOutput()
-      : /(作品集|设计|视觉|portfolio)/i.test(text)
-        ? buildPortfolioOutput()
-      : /(流程|工作流|每天先做什么|优先级|效率|sop|自动化|项目管理)/i.test(text)
-        ? buildWorkflowOutput()
-      : /(短视频|视频方案|视频脚本|分镜|拍摄|剪辑|口播)/i.test(text)
-        ? buildVideoOutput()
-        : skillMatched.name === '学习路径 Skill'
-          ? buildLearningOutput()
-          : buildGenericOutput(skillMatched.name);
+  const output = buildOutputForIntent(profile, intent, skillMatched.name);
 
   return {
     problemCore: {
