@@ -212,6 +212,33 @@ function coerceSolutionResult(
     };
   }
 
+  if (mode === 'action') {
+    const hasActionSection = result.usableOutput.sections.some(section => section.heading.includes('执行清单'));
+    const hasActionCopy = result.copyableTemplates.some(template => template.title.includes('执行清单'));
+    const fallbackActionContent = [
+      '1. 先确认本次要完成的最小结果。',
+      '2. 复制上一版中最接近可交付的内容。',
+      '3. 补齐必要对象、材料、数据或限制条件。',
+      '4. 按检查标准删掉空泛解释，只保留可执行内容。',
+      '5. 完成后记录下一处需要继续调整的问题。',
+    ].join('\n');
+
+    result = {
+      ...result,
+      usableOutput: {
+        title: result.usableOutput.title.includes('执行清单')
+          ? result.usableOutput.title
+          : `执行清单 / 行动清单：${result.usableOutput.title}`,
+        sections: hasActionSection
+          ? result.usableOutput.sections
+          : [{ heading: '执行清单 / 行动清单', content: fallbackActionContent }, ...result.usableOutput.sections],
+      },
+      copyableTemplates: hasActionCopy
+        ? result.copyableTemplates
+        : [{ title: '执行清单 / 行动清单', content: fallbackActionContent }, ...result.copyableTemplates],
+    };
+  }
+
   return result;
 }
 
