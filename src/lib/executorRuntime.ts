@@ -1,7 +1,6 @@
 import { renderDeliverables } from './deliverableRenderer';
 import { runCopywritingExecutor } from './executors/copywritingExecutor';
 import { runLlmReasoningExecutor } from './executors/llmReasoningExecutor';
-import { composeExecutorResults } from './executors/resultComposer';
 import { runTableGenerationExecutor } from './executors/tableGenerationExecutor';
 import type { OutputContract } from './outputContract';
 import type {
@@ -49,7 +48,27 @@ export function selectExecutorsForDeliverable(
     executors.add('TABLE_GENERATION');
   }
 
+  if (
+    deliverable.type === 'analysis_table' ||
+    deliverable.type === 'metric_analysis' ||
+    deliverable.type === 'rubric' ||
+    deliverable.type === 'risk_plan' ||
+    deliverable.type === 'clarification_flow'
+  ) {
+    executors.add('TABLE_GENERATION');
+    executors.add('LLM_REASONING');
+  }
+
   if (deliverable.type === 'document') {
+    executors.add('LLM_REASONING');
+    executors.add('COPYWRITING');
+  }
+
+  if (
+    deliverable.type === 'research_report' ||
+    deliverable.type === 'validation_plan' ||
+    deliverable.type === 'experience_rewrite'
+  ) {
     executors.add('LLM_REASONING');
     executors.add('COPYWRITING');
   }
@@ -62,8 +81,8 @@ export function selectExecutorsForDeliverable(
     deliverable.type === 'workflow' ||
     deliverable.type === 'checklist' ||
     deliverable.type === 'outline' ||
-    deliverable.type === 'diagnosis' ||
-    deliverable.type === 'plan'
+      deliverable.type === 'diagnosis' ||
+      deliverable.type === 'plan'
   ) {
     executors.add('LLM_REASONING');
   }
@@ -178,7 +197,10 @@ export function runExecutorRuntime(input: ExecutorRuntimeInput): ExecutorRunResu
     };
   }
 
-  const composedResult = composeExecutorResults(input.contract.title, executorResults, fallback);
+  // Output Contract v2: executors are still selected and run for runtime evidence,
+  // but the user-facing composed result is contract-rendered so older executor
+  // snippets cannot leak the wrong identity/context into the workspace.
+  const composedResult = fallback;
 
   return {
     runId: `runtime-${input.frame.centerOutput.outputType}-${input.contract.deliverables.length}`,

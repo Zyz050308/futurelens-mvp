@@ -1,519 +1,532 @@
 import type { SolutionResult } from '@/types/radar';
 import type { OutputContract } from './outputContract';
-import type { ProblemFrame } from './problemFrameEngine';
+import type { OutputContractId, ProblemFrame } from './problemFrameEngine';
 
 type RenderedDeliverables = Pick<SolutionResult, 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'>;
-
-type Deliverable = OutputContract['deliverables'][number];
 type CopyableTemplate = SolutionResult['copyableTemplates'][number];
 
-function hasNeed(frame: ProblemFrame, keyword: string): boolean {
-  return frame.rawProblem.includes(keyword) || frame.transformationNeeded.some(item => item.includes(keyword));
+function source(frame: ProblemFrame): string {
+  return [frame.rawProblem, frame.supportText, frame.outputNeed, frame.audience].filter(Boolean).join(' ');
 }
 
-function hasAnyNeed(frame: ProblemFrame, keywords: string[]): boolean {
-  return keywords.some(keyword => hasNeed(frame, keyword));
+function hasAny(frame: ProblemFrame, words: string[]): boolean {
+  const text = source(frame);
+  return words.some(word => text.includes(word));
 }
 
-function missingLabel(frame: ProblemFrame, index: number, fallback: string): string {
-  return frame.missingInfo[index] || fallback;
+function normalizeSections(sections: Array<{ heading: string; content: string }>): Array<{ heading: string; content: string }> {
+  const map = new Map<string, string>();
+  for (const section of sections) {
+    const existing = map.get(section.heading);
+    if (!existing) {
+      map.set(section.heading, section.content.trim());
+    } else if (existing !== section.content.trim()) {
+      map.set(section.heading, `${existing}\n\n${section.content.trim()}`);
+    }
+  }
+  return Array.from(map.entries()).map(([heading, content], index) => ({
+    heading: `${index + 1}. ${heading}`,
+    content,
+  }));
 }
 
-function renderTableDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  const rows = [
-    ['周期 / 对象', '标记这份表对应的时间或对象', '本月 / 本项目 / 本批次', '必须和数据来源一致', '缺失时先不要汇总'],
-    ['核心指标', '记录最需要被判断的数字或状态', '收入、完成量、数量、评分', '只放会影响判断的指标', '指标过多时先保留 5 个以内'],
-    ['来源', '说明数据从哪里来', '系统导出、人工记录、流水、访谈', '每个数字都要能追溯', '来源不明时标记待确认'],
-    ['计算规则', '说明这个字段如何得到', 'A-B、A/B、求和、环比', '写成可复用规则', '公式不清楚时先写判断逻辑'],
-    ['异常说明', '解释明显变化或不确定项', '本月增加来自……', '只解释影响结论的异常', '异常没有解释时不能直接下结论'],
-    ['接收方备注', '把数据翻译成别人能理解的话', '需要关注…… / 建议下一步……', '一句话说清影响', '避免只贴数字'],
-  ];
-
-  const fieldTable = [
-    '| 字段名 | 用途 | 示例值 | 填写 / 计算规则 | 检查点 |',
-    '| --- | --- | --- | --- | --- |',
+function table(headers: string[], rows: string[][]): string {
+  return [
+    `| ${headers.join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
     ...rows.map(row => `| ${row.join(' | ')} |`),
   ].join('\n');
-
-  const logic = hasAnyNeed(frame, ['计算逻辑', '判断'])
-    ? [
-        '',
-        '计算 / 判断逻辑：',
-        '1. 先确认每个核心指标的数据来源。',
-        '2. 再写清计算关系，例如：结果 = 输入项 A - 输入项 B。',
-        '3. 如果无法计算，就改成判断规则：高 / 中 / 低，正常 / 异常。',
-        '4. 每个异常值都要补一句原因或待确认来源。',
-      ].join('\n')
-    : '';
-
-  const reportCopy = hasAnyNeed(frame, ['汇报表达', '说明'])
-    ? [
-        '',
-        '说明文案模板：',
-        '本期【核心指标】为【数值】，相比【对比对象】变化【比例 / 状态】。',
-        '主要原因是【原因 1】和【原因 2】。',
-        '其中最需要关注的是【异常项】，它可能影响【影响范围】。',
-        '下一步建议先确认【待确认信息】，再决定【下一步动作】。',
-      ].join('\n')
-    : '';
-
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    fieldTable,
-    logic,
-    reportCopy,
-  ].filter(Boolean).join('\n');
 }
 
-function renderWorkflowDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  const isProductionFlow = hasAnyNeed(frame, ['拆解参考', '生成脚本', '生成分镜', '整理素材']);
-  const isEfficiencyFlow = deliverable.title.includes('效率') || hasAnyNeed(frame, ['效率流程']);
-  const rows = isProductionFlow
-    ? [
-        ['1', '参考对象', '拆解结构、节奏、可替换变量', '参考拆解表', '提取出可复用结构'],
-        ['2', '自己的目标和素材', '替换成自己的对象、素材和表达重点', '脚本初稿', '每段都有可替换变量'],
-        ['3', '脚本初稿', '拆成镜头 / 步骤 / 画面', '分镜表', '每个镜头对应一个信息点'],
-        ['4', '分镜表', '整理已有和缺失素材', '素材清单', '每个素材都有使用位置'],
-        ['5', '素材清单', '按顺序执行制作并复盘', '可复用生产流程', '下一次可以沿用同一流程'],
-      ]
-    : isEfficiencyFlow
-      ? [
-          ['1', '已有材料', '让 AI 先提取结构和缺口', '问题清单', '只保留影响判断的缺口'],
-          ['2', '问题清单', '让 AI 生成 2-3 个改写方向', '改写候选', '每个候选都有不同侧重点'],
-          ['3', '改写候选', '人工选择最贴近目标对象的一版', '选定版本', '不让 AI 替你决定方向'],
-          ['4', '选定版本', '让 AI 检查表达、证据和顺序', '检查结果', '检查项能对应回具体段落'],
-          ['5', '检查结果', '人工补充真实证据和细节', '可交付版本', '保留真实信息和个人判断'],
-        ]
-    : [
-        ['1', '所有待处理事项', '收集任务池，不先判断重要性', '完整任务列表', '没有遗漏明显任务'],
-        ['2', '任务列表', '标记截止时间、影响程度、依赖关系', '优先级标签', '知道哪些必须今天处理'],
-        ['3', '优先级标签', '选出 1 个主任务 + 2 个次任务', '今日执行清单', '今天不再反复选择'],
-        ['4', '今日执行清单', '安排时间块和检查点', '时间块计划', '每个任务有开始和结束标准'],
-        ['5', '当天执行结果', '结束前记录完成、卡点、明天入口', '复盘记录', '明天能接着推进'],
-      ];
-
+function genericChecklist(): string {
   return [
-    `用途：${deliverable.purpose}`,
-    '',
-    '| 步骤 | 输入物 | 操作 | 输出物 | 完成标准 / 检查点 |',
-    '| --- | --- | --- | --- | --- |',
-    ...rows.map(row => `| ${row.join(' | ')} |`),
-    '',
-    '优先级规则：',
-    ...(isProductionFlow
-      ? [
-          '1. 先确定参考结构，再替换成自己的内容。',
-          '2. 先完成能被检查的第一版，再补充风格和细节。',
-          '3. 先整理已有素材，再决定哪些内容需要补拍、补写或用 AI 生成初稿。',
-        ]
-      : isEfficiencyFlow
-        ? [
-            '1. 先让 AI 做结构提取和初稿生成，不直接交付最终判断。',
-            '2. 人工负责选择方向、补真实证据和确认目标对象。',
-            '3. 每次只优化一个模块，避免一次性重写导致失真。',
-          ]
-      : [
-          '1. 先做有截止时间、会影响别人、会阻塞后续步骤的任务。',
-          '2. 再做能产出可见结果的任务。',
-          '3. 最后处理可以批量化、模板化或延后的任务。',
-        ]),
-    '',
-    isProductionFlow
-      ? 'SOP：找参考 → 拆结构 → 替换变量 → 生成脚本 / 内容 → 拆步骤或分镜 → 整理素材 → 执行第一版 → 复盘 → 更新模板。'
-      : isEfficiencyFlow
-        ? 'SOP：输入已有材料 → AI 提取结构 → AI 生成候选 → 人工选择方向 → AI 检查缺口 → 人工补证据 → 输出可交付版本。'
-      : 'SOP：收集任务 → 标记优先级 → 选出今日主线 → 安排时间块 → 执行 → 复盘 → 更新下一步。',
-  ].join('\n');
-}
-
-function renderScriptDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  const subject = frame.centerOutput.name;
-
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    '可替换脚本结构：',
-    `开头 3 秒：我现在要解决的是【${subject}】里的【具体卡点】。`,
-    '中段展开：先展示【现状 / 材料 / 参考对象】，再说明【我采用的判断标准】。',
-    '证据 / 展示：放入【数据 / 片段 / 过程 / 对比】证明这个判断不是空想。',
-    '结尾行动：下一步我会先完成【最小动作】，用【检查标准】判断是否有效。',
-    '',
-    '可替换变量：',
-    '- 【具体卡点】：你现在最不确定的一步。',
-    '- 【判断标准】：别人看完后最需要确认的标准。',
-    '- 【最小动作】：今天能完成的一小步。',
-  ].join('\n');
-}
-
-function renderOutlineDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  if (deliverable.title.includes('分镜')) {
-    return [
-      `用途：${deliverable.purpose}`,
-      '',
-      '| 镜头 / 步骤 | 画面或动作 | 文字说明 | 所需素材 | 备注 |',
-      '| --- | --- | --- | --- | --- |',
-      '| 1 | 展示当前问题或目标 | 说明为什么要做这件事 | 现状画面 / 文字卡 | 控制在开头 3 秒 |',
-      '| 2 | 展示参考或输入材料 | 标出可借鉴的结构 | 参考截图 / 素材 | 只拆结构，不照抄内容 |',
-      '| 3 | 展示自己的替换版本 | 说明如何换成自己的内容 | 自有素材 | 对应一个核心信息点 |',
-      '| 4 | 展示初版结果 | 让别人看到可用成果 | 成果截图 / 文本 | 不追求完整，先可判断 |',
-      '| 5 | 给出下一步 | 引导继续补充或验证 | 检查清单 | 留下可继续修改的入口 |',
-    ].join('\n');
-  }
-
-  if (deliverable.title.includes('参考')) {
-    return [
-      `用途：${deliverable.purpose}`,
-      '',
-      '| 拆解项 | 参考对象怎么做 | 可复用规则 | 我的替换版本 |',
-      '| --- | --- | --- | --- |',
-      '| 目标 | 它想让人理解什么 | 先明确单一目标 | 我这次要让人理解【目标】 |',
-      '| 结构 | 它按什么顺序展开 | 提取顺序，不复制内容 | 我的顺序是【1 / 2 / 3】 |',
-      '| 变量 | 哪些内容可以替换 | 找到可替换位置 | 替换成我的【对象 / 素材 / 观点】 |',
-      '| 节奏 | 哪一步最抓注意力 | 保留节奏逻辑 | 用我的材料重新表达 |',
-      '| 检查 | 它为什么能被看懂 | 提取判断标准 | 用同一标准检查我的版本 |',
-    ].join('\n');
-  }
-
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    '推荐结构：',
-    '1. 先说明目标：这份成果要让谁理解什么。',
-    '2. 再说明现状：你现在已有的信息、材料或限制。',
-    '3. 展开核心内容：按 3-5 个模块组织，不要堆散点。',
-    '4. 补充证据：放入数据、例子、过程、对比或参考。',
-    '5. 给出下一步：看完后对方应该做什么，或你下一步要改哪里。',
-  ].join('\n');
-}
-
-function renderDiagnosisDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    '| 可能问题 | 为什么影响使用 | 修改方向 |',
-    '| --- | --- | --- |',
-    '| 目的不清 | 接收方不知道这份材料要解决什么 | 开头补一句“这份材料用于【用途】” |',
-    '| 对象不清 | 不知道应该按谁的标准判断 | 写明接收方是【目标对象】 |',
-    '| 结构松散 | 信息很多但没有阅读顺序 | 改成“目的 → 关键信息 → 证据 → 结论” |',
-    '| 证据不足 | 只有判断，没有支撑 | 补充数据、例子、过程或对比 |',
-    '| 下一步不明 | 看完不知道该怎么处理 | 结尾写清“希望对方判断 / 反馈 / 执行什么” |',
-  ].join('\n');
-}
-
-function renderDocumentDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  const isProjectLike = hasAnyNeed(frame, ['项目说明', '作品集']);
-
-  if (isProjectLike) {
-    return [
-      `用途：${deliverable.purpose}`,
-      '',
-      '项目说明结构：',
-      '项目背景：这个项目来自【真实场景 / 课程 / 需求】，要解决【问题】。',
-      '目标对象：这份内容主要给【目标对象】看，他们最关心【判断标准】。',
-      '我的角色：我负责【调研 / 结构 / 视觉 / 执行 / 复盘】中的【具体部分】。',
-      '方法过程：我先【步骤 1】，再【步骤 2】，最后用【标准】检查结果。',
-      '最终成果：最后产出了【成果】，它证明了【能力 / 判断 / 结果】。',
-      '待补充证据：还需要补【数据 / 反馈 / 对比 / 过程图】。',
-    ].join('\n');
-  }
-
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    '可替换段落模板：',
-    '这份材料想说明的是【核心信息】。',
-    '接收方最需要理解的是【关键结论】。',
-    '目前已有的信息包括【已有材料 / 数据 / 例子】。',
-    '为了让它更可信，还需要补充【证据 / 数据 / 示例】。',
-    '建议下一步先修改【最影响理解的一段】，再检查整体结构。',
-    '',
-    '推荐结构：目的 → 关键信息 → 证据支撑 → 结论 / 下一步动作。',
-  ].join('\n');
-}
-
-function renderChecklistDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  if (deliverable.title.includes('计算') || deliverable.title.includes('判断')) {
-    return [
-      `用途：${deliverable.purpose}`,
-      '',
-      '| 输入项 | 处理逻辑 | 输出结果 | 异常说明 |',
-      '| --- | --- | --- | --- |',
-      '| 原始数据 A | 与 B 做差值、比例或状态判断 | 得到核心结果 | 如果来源不明，标记待确认 |',
-      '| 对比数据 B | 用于环比、同比、前后对比或基准比较 | 得到变化方向 | 如果缺少基准，先写“无法判断” |',
-      '| 判断标准 | 高 / 中 / 低，正常 / 异常，可用 / 不可用 | 得到行动建议 | 标准不清时先让接收方确认 |',
-      '',
-      '计算逻辑清单：',
-      '- [ ] 每个结果都能追溯到输入项。',
-      '- [ ] 每个公式或判断规则都写成可复用句子。',
-      '- [ ] 每个异常结果都补充原因、影响和下一步处理建议。',
-      '- [ ] 不确定的数据不要直接汇总，先标记“待确认”。',
-    ].join('\n');
-  }
-
-  if (deliverable.title.includes('素材')) {
-    return [
-      `用途：${deliverable.purpose}`,
-      '',
-      '- [ ] 列出已有素材：文字、图片、表格、参考对象、数据、草稿。',
-      '- [ ] 给每个素材标注用途：开头、说明、证明、展示、结尾。',
-      '- [ ] 标出缺失素材：哪些地方没有证据或例子。',
-      '- [ ] 写出补充方式：自己补写、重新整理、询问别人、用 AI 生成初稿。',
-      '- [ ] 给素材命名：用途_来源_日期，避免后续找不到。',
-    ].join('\n');
-  }
-
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    '- [ ] 目标是否一句话能说清。',
-    '- [ ] 接收方是否明确。',
-    '- [ ] 每个模块是否有输入、处理和输出。',
-    '- [ ] 是否至少有一个可复制的段落、表格或步骤。',
+    '- [ ] 目标对象是否明确。',
+    '- [ ] 每个模块是否有具体字段、步骤或段落。',
+    '- [ ] 是否有可复制内容，而不是只有建议。',
     '- [ ] 缺失信息是否用【占位符】标出。',
-    '- [ ] 下一步动作是否能在今天完成。',
+    '- [ ] 下一步是否能在今天执行。',
   ].join('\n');
 }
 
-function renderGenericDeliverable(frame: ProblemFrame, deliverable: Deliverable): string {
-  return [
-    `用途：${deliverable.purpose}`,
-    '',
-    `第一版目标：先生成一份「${frame.centerOutput.name}」。`,
-    '1. 明确接收方：谁会看或使用它。',
-    '2. 明确输入：已有材料、数据、参考或限制是什么。',
-    '3. 明确结构：先给出 3-5 个模块。',
-    '4. 明确产出：每个模块至少有一段文字、一个字段表或一个步骤。',
-    '5. 明确检查：做完后用清单判断是否能继续推进。',
+function renderMessageDraft(): RenderedDeliverables {
+  const message = [
+    '老师您好，我想确认一下这次作业的提交时间。',
+    '请问是【具体日期 / 时间】前提交吗？',
+    '另外想确认提交方式是【平台 / 邮箱 / 纸质】吗？',
+    '麻烦老师有空时帮我确认一下，谢谢老师。',
   ].join('\n');
-}
 
-function renderSection(frame: ProblemFrame, deliverable: Deliverable): string {
-  if (deliverable.type === 'table') return renderTableDeliverable(frame, deliverable);
-  if (deliverable.type === 'workflow') return renderWorkflowDeliverable(frame, deliverable);
-  if (deliverable.type === 'script') return renderScriptDeliverable(frame, deliverable);
-  if (deliverable.type === 'outline') return renderOutlineDeliverable(frame, deliverable);
-  if (deliverable.type === 'diagnosis') return renderDiagnosisDeliverable(frame, deliverable);
-  if (deliverable.type === 'document') return renderDocumentDeliverable(frame, deliverable);
-  if (deliverable.type === 'checklist') return renderChecklistDeliverable(frame, deliverable);
-  return renderGenericDeliverable(frame, deliverable);
-}
-
-function buildFieldTableTemplate(): CopyableTemplate {
   return {
-    title: '字段表模板',
-    content: [
-      '| 字段名 | 用途 | 示例值 | 填写 / 计算规则 | 检查点 |',
-      '| --- | --- | --- | --- | --- |',
-      '| 周期 / 对象 | 标记这份成果对应的范围 | 本月 / 本项目 | 和数据来源一致 | 范围不清不汇总 |',
-      '| 核心指标 | 记录最需要判断的内容 | 数值 / 状态 / 结果 | 只放影响判断的指标 | 不超过 5 个核心指标 |',
-      '| 来源 | 说明信息从哪里来 | 记录 / 数据 / 访谈 | 必须能追溯 | 来源不明要标记 |',
-      '| 异常说明 | 解释明显变化 | 增加 / 下降 / 缺失 | 写清原因或待确认 | 无解释不下结论 |',
-    ].join('\n'),
+    usableOutput: {
+      title: '可直接发送的消息草稿',
+      sections: normalizeSections([
+        { heading: '消息目的', content: '确认作业提交时间和提交方式，语气保持礼貌、简洁，不让对方额外猜测你想问什么。' },
+        { heading: '消息结构', content: '1. 先称呼接收方。\n2. 直接说明想确认的事项。\n3. 用占位符标出时间点或提交方式。\n4. 结尾表达感谢。' },
+        { heading: '可复制消息版本', content: message },
+        { heading: '更礼貌版本', content: `${message}\n\n如果老师方便的话，也想请您提醒一下是否还有格式或命名要求，我会按要求整理后提交。` },
+        { heading: '注意事项', content: '- 不要一上来解释太多背景。\n- 不要连续问很多无关问题。\n- 如果已经有课程群通知，先说明“我看了通知但还有一处想确认”。' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '可直接发送的消息', content: message },
+      { title: '更礼貌版本', content: `${message}\n如果老师方便的话，也想请您提醒一下是否还有格式或命名要求。` },
+    ],
+    nextRefinementPrompt: '例如：老师比较严格，我想语气再正式一点，或者我想顺便问提交格式。',
   };
 }
 
-function buildCalculationTemplate(): CopyableTemplate {
+function renderResearchReport(): RenderedDeliverables {
+  const structure = [
+    '1. 封面：调研主题、姓名、课程、完成时间。',
+    '2. 调研目的：为什么调研这个地域文化主题，要回答什么问题。',
+    '3. 调研对象：地域、文化元素、照片、资料来源。',
+    '4. 资料整理：把照片、网上资料、观察记录分别放到对应页面。',
+    '5. 核心发现：提炼 2-3 个文化特征或规律。',
+    '6. 结论：这次调研对课程作业或汇报主题有什么启发。',
+  ].join('\n');
+
   return {
-    title: '计算 / 判断逻辑模板',
-    content: [
-      '输入项：A =【输入 1】，B =【输入 2】',
-      '处理逻辑：结果 = A 与 B 的差值 / 比例 / 状态判断',
-      '输出结果：【结果值】',
-      '异常说明：如果结果超过【阈值】，需要补充【原因 / 来源 / 处理建议】。',
-    ].join('\n'),
+    usableOutput: {
+      title: '调研汇报结构 / 资料组织框架第一版',
+      sections: normalizeSections([
+        { heading: '汇报结构', content: structure },
+        {
+          heading: '每页放什么',
+          content: table(
+            ['页码', '页面主题', '放什么内容', '检查点'],
+            [
+              ['1', '主题和目的', '标题、调研范围、核心问题', '一眼能看懂主题'],
+              ['2', '资料来源', '照片、网页资料、观察记录', '每个资料有来源'],
+              ['3', '文化元素', '建筑、图案、习俗、文字、人物或场景', '不只堆图片'],
+              ['4', '分析发现', '相似点、差异、背后原因', '有自己的判断'],
+              ['5', '总结', '结论、启发、可继续研究方向', '能收束作业'],
+            ]
+          ),
+        },
+        { heading: '资料整理清单', content: '- 照片：标注拍摄地点、拍摄对象、能说明什么。\n- 网上资料：记录标题、来源、关键观点。\n- 观察记录：写下你看到的细节和初步判断。\n- 缺失资料：标出还需要补一张图、一个案例或一条解释。' },
+        { heading: '开头介绍模板', content: '本次汇报围绕【调研主题】展开，主要想回答【核心问题】。\n我目前收集了【照片 / 资料 / 观察记录】，会从【文化元素】、【资料证据】和【个人发现】三个部分说明。\n最后会总结这次调研对【课程主题 / 作业要求】的启发。' },
+        { heading: '完成检查清单', content: '- [ ] 每页标题是否清楚。\n- [ ] 每张图是否有说明。\n- [ ] 资料来源是否标注。\n- [ ] 是否有 2-3 个自己的发现。\n- [ ] 结论是否回应调研目的。' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '汇报结构模板', content: structure },
+      { title: '开头介绍模板', content: '本次汇报围绕【调研主题】展开，主要想回答【核心问题】。\n我目前收集了【已有资料】，会从【维度一】、【维度二】和【维度三】说明。\n最后会总结这次调研对【课程主题】的启发。' },
+      { title: '资料整理清单', content: '照片：\n来源：\n能说明什么：\n放在哪一页：\n还缺什么：' },
+    ],
+    nextRefinementPrompt: '例如：我的主题是地方建筑文化，已有 4 张照片和两段资料，想做 5 页 PPT。',
   };
 }
 
-function buildReportTemplate(frame: ProblemFrame): CopyableTemplate {
-  const audience = frame.audience || '接收方';
+function renderAnalysisTable(frame: ProblemFrame): RenderedDeliverables {
+  const isSales = hasAny(frame, ['销售表', '卖得最好']);
+  const isFinance = hasAny(frame, ['财务报表', '报表']);
+
+  const fields = isSales
+    ? table(
+        ['字段', '用途', '示例', '规则', '检查点'],
+        [
+          ['产品名称', '识别分析对象', '拿铁 / 套餐A', '每行一个产品', '不要把不同规格混在一起'],
+          ['销量', '判断卖得好不好', '128', '统计同一时间范围', '缺失时先标记待确认'],
+          ['销售额', '判断收入贡献', '5600', '销量 x 单价', '与流水总额核对'],
+          ['排名', '找出 Top 产品', '第 1 名', '按销量或销售额排序', '说明排序口径'],
+          ['占比', '判断贡献程度', '23%', '单品销售额 / 总销售额', '占比过高要看风险'],
+          ['趋势', '判断是否持续变好', '+12%', '本期 vs 上期', '不要只看单日'],
+        ]
+      )
+    : isFinance
+      ? table(
+          ['字段名', '用途', '示例值', '填写 / 计算规则', '检查点'],
+          [
+            ['月份', '记录周期', '2026年6月', '与数据来源周期一致', '周期不清不汇总'],
+            ['收入', '本期收入规模', '120000', '按实际入账口径统计', '和流水核对'],
+            ['成本', '本期直接成本', '76000', '只放与收入直接相关成本', '口径要一致'],
+            ['毛利', '判断经营质量', '44000', '收入 - 成本', '公式可复算'],
+            ['毛利率', '判断利润效率', '36.7%', '毛利 / 收入', '收入为 0 不计算'],
+            ['异常说明', '解释明显变化', '成本上升来自...', '只解释影响结论的异常', '没有原因先标待确认'],
+          ]
+        )
+      : table(
+          ['字段', '用途', '示例', '规则', '检查点'],
+          [
+            ['时间范围', '限定分析周期', '本周 / 本月', '和数据来源一致', '不能混用周期'],
+            ['核心数据', '记录最关键数字', '订单数 / 销售额', '只放影响判断的数据', '来源可追溯'],
+            ['反馈类别', '整理文字反馈', '价格 / 产品 / 服务', '保留原话线索', '不要只写主观猜测'],
+            ['可能原因', '形成假设', '价格感知偏高', '必须能被验证', '每个原因有证据'],
+            ['下一步动作', '小范围调整', '测试一个套餐', '7 天内能观察', '动作要有指标'],
+          ]
+        );
+
+  const reasonTable = isSales
+    ? table(
+        ['判断维度', '需要看的数据', '可能原因', '验证动作', '下一步动作'],
+        [
+          ['销量排名', '各产品销量', '爆品集中或长尾太多', '按销量排序 Top 10', '保留高销量产品，检查低销量产品'],
+          ['销售额贡献', '销售额和占比', '高销量但低收入', '按销售额排序', '调整组合或价格'],
+          ['趋势变化', '本期 vs 上期', '活动、季节、库存影响', '看连续 7 天趋势', '继续观察或调整陈列'],
+        ]
+      )
+    : table(
+        ['原因维度', '需要看的数据 / 反馈', '可能原因', '验证动作', '调整建议'],
+        [
+          ['价格', '客单价、价格相关反馈', '用户觉得价值不清', '看评价是否提到贵/不值', '测试套餐或价值说明'],
+          ['产品', '复购、退单、低分评价', '产品体验不稳定', '分类高频差评', '先修最高频问题'],
+          ['流量', '订单数、时段、来源', '曝光或到店减少', '对比上周同日', '测试引流或时段动作'],
+          ['流程', '等待时长、投诉、员工反馈', '高峰流程卡住', '观察高峰时段', '调整排班或出餐顺序'],
+        ]
+      );
 
   return {
-    title: '说明文案模板',
-    content: [
-      `这份内容给【${audience}】看的核心结论是：【关键结论】。`,
-      '本期 / 本版最重要的变化是：【变化或结果】。',
-      '主要原因是：【原因 1】和【原因 2】。',
-      '目前最不确定的是：【待确认信息】。',
-      '下一步建议先做：【具体动作】。',
-    ].join('\n'),
+    usableOutput: {
+      title: `${frame.centerOutput.name}第一版`,
+      sections: normalizeSections([
+        { heading: '数据字段表', content: fields },
+        { heading: '原因判断维度', content: reasonTable },
+        { heading: '反馈 / 数据分类表', content: table(['来源', '原始信息', '分类', '可能原因', '处理建议'], [['订单流水', '【数据变化】', '数据', '待判断', '和对比周期核对'], ['顾客反馈', '【原话】', '反馈', '待判断', '归入价格/产品/流程等维度']]) },
+        { heading: '可能原因', content: '先不要一次下结论。把可能原因拆成：数据变化、用户反馈、外部环境、内部流程四类，每一类至少找 1 条证据。' },
+        { heading: '下一步调整动作', content: '第 1 天：整理字段表。\n第 2 天：找出最大变化项。\n第 3 天：分类反馈。\n第 4-5 天：只测试一个调整动作。\n第 6 天：观察数据变化。\n第 7 天：决定继续、停止或换方向。' },
+        ...(isFinance ? [{ heading: '说明文案模板', content: '本期【核心指标】为【数值】，相比【对比周期】变化【比例】。\n主要原因可能是【原因一】和【原因二】。\n其中最需要关注的是【异常项目】，它可能影响【影响范围】。\n下一步建议先确认【待确认信息】，再决定【调整动作】。' }] : []),
+      ]),
+    },
+    copyableTemplates: [
+      { title: '分析字段表', content: fields },
+      { title: '原因判断表', content: reasonTable },
+      { title: '下一步调整动作', content: '本周只验证一个原因假设：【原因假设】。\n要看的指标：【指标】。\n要做的动作：【动作】。\n7 天后判断：如果【指标变化】，就继续；如果没有变化，就换下一个原因假设。' },
+      ...(isFinance ? [{ title: '说明文案模板', content: '本期【核心指标】为【数值】，相比【对比周期】变化【比例】。\n主要原因可能是【原因一】和【原因二】。\n其中最需要关注的是【异常项目】，它可能影响【影响范围】。\n下一步建议先确认【待确认信息】，再决定【调整动作】。' }] : []),
+    ],
+    nextRefinementPrompt: '例如：我有上周和本周的订单流水，还有 20 条顾客评价。',
   };
 }
 
-function buildDocumentTemplate(): CopyableTemplate {
+function renderRubricAssignment(): RenderedDeliverables {
+  const rubric = table(
+    ['评分维度', '权重', '优秀标准', '合格标准', '常见扣分点'],
+    [
+      ['作业目标', '20%', '问题清楚，调研范围明确', '能说明主题', '主题太大或不聚焦'],
+      ['资料收集', '25%', '来源多样且标注清楚', '有基本资料', '堆资料、无来源'],
+      ['分析判断', '30%', '能提炼规律和观点', '有简单分类', '只有描述没有分析'],
+      ['表达呈现', '15%', '结构清楚、页面有层次', '基本能看懂', '信息混乱或重复'],
+      ['提交规范', '10%', '格式、命名、页数符合要求', '基本按要求提交', '缺文件或命名混乱'],
+    ]
+  );
+  const message = '本次作业要求大家围绕【课程主题】完成一次设计调研。\n请提交【提交物一】、【提交物二】和【提交物三】。\n评分会重点看：调研目标是否清楚、资料是否有来源、分析是否有自己的判断、表达是否清晰。\n请注意：不要只堆资料，必须说明你的观察和判断。';
+
   return {
-    title: '通用材料改写模板',
-    content: [
-      '这份材料想说明的是【核心信息】。',
-      '接收方最需要理解的是【关键结论】。',
-      '目前已有的信息包括【已有材料 / 数据 / 例子】。',
-      '最需要补充的是【证据 / 数据 / 示例】。',
-      '下一步请先检查【最影响理解的一段】是否足够清楚。',
-    ].join('\n'),
+    usableOutput: {
+      title: '作业说明 / 评分标准第一版',
+      sections: normalizeSections([
+        { heading: '作业目标', content: '让学生围绕【课程主题】完成一次有明确对象、资料来源和分析判断的设计调研。' },
+        { heading: '任务说明', content: '选择一个具体调研对象，收集资料，整理观察，提炼 2-3 个发现，并用 PPT 或文档展示。' },
+        { heading: '提交物清单', content: '- 调研主题说明\n- 资料来源截图或链接\n- 3-5 页汇报内容\n- 结论或反思\n- 文件命名：【姓名-课程-调研主题】' },
+        { heading: '评分标准表', content: rubric },
+        { heading: '学生常见误解提示', content: '- 不是资料越多越好，而是资料要能支撑结论。\n- 不是只做版面排版，要有分析判断。\n- 图片必须配说明，不要只放图。\n- 结论要回应调研目标。' },
+        { heading: '可复制发布文案', content: message },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '作业发布文案', content: message },
+      { title: '评分标准表', content: rubric },
+    ],
+    nextRefinementPrompt: '例如：课程主题是城市视觉调研，提交形式是 5 页 PPT，满分 100 分。',
   };
 }
 
-function buildStructureTemplate(): CopyableTemplate {
+function renderRubricSelfAssessment(): RenderedDeliverables {
+  const selfRubric = table(
+    ['维度', '5分标准', '3分标准', '1分标准', '今日记录', '明日改进'],
+    [
+      ['投入时间', '完成计划时长且专注', '完成一半以上', '几乎没开始', '【分钟】', '【调整动作】'],
+      ['理解程度', '能复述并举例', '大致理解但不稳', '看完仍说不清', '【卡点】', '【补练内容】'],
+      ['输出结果', '留下可检查成果', '有零散记录', '没有产出', '【成果】', '【下一步】'],
+      ['复盘质量', '写清问题和改进', '只记录完成情况', '没有复盘', '【发现】', '【改进】'],
+    ]
+  );
+
   return {
-    title: '结构框架模板',
-    content: [
-      '1. 目的：这份成果要解决什么问题？',
-      '2. 对象：谁会看或使用它？',
-      '3. 关键信息：对方必须先理解哪 3 点？',
-      '4. 证据：用什么数据、例子、过程或对比支撑？',
-      '5. 结论：看完后要做什么或判断什么？',
-    ].join('\n'),
+    usableOutput: {
+      title: '自评评分标准 / 每日记录表第一版',
+      sections: normalizeSections([
+        { heading: '自评维度', content: '从投入时间、理解程度、输出结果、复盘质量四个维度评分，避免只凭感觉判断今天学得好不好。' },
+        { heading: '评分等级', content: selfRubric },
+        { heading: '每日记录表', content: table(['日期', '学习内容', '总分', '最大卡点', '明日改进'], [['【日期】', '【内容】', '【分数】', '【卡点】', '【动作】']]) },
+        { heading: '改进建议', content: '如果连续两天低于 3 分，先降低任务难度；如果输出结果为空，第二天必须改成能留下可见成果的小任务。' },
+        { heading: '复盘问题', content: '1. 今天真正完成了什么？\n2. 哪一步最卡？\n3. 是时间不够、方法不清，还是材料太难？\n4. 明天要降低难度还是增加练习？' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '每日自评表', content: selfRubric },
+      { title: '复盘问题', content: '今天完成了：\n最大卡点是：\n我给自己的分数是：\n明天先改：' },
+    ],
+    nextRefinementPrompt: '例如：我每天学英语 40 分钟，想用这个表记录口语练习效果。',
   };
 }
 
-function buildWorkflowTemplate(frame: ProblemFrame): CopyableTemplate {
-  const isProductionFlow = hasAnyNeed(frame, ['拆解参考', '生成脚本', '生成分镜', '整理素材']);
-  const isEfficiencyFlow = hasAnyNeed(frame, ['效率流程']);
+function renderValidationPlan(): RenderedDeliverables {
+  const interview = '1. 你上一次遇到【问题】是什么时候？\n2. 当时你怎么解决？花了多少时间或成本？\n3. 现在的解决方式哪里不满意？\n4. 如果有一个最小版本只解决【核心动作】，你会愿意试用吗？为什么？\n5. 什么结果会让你愿意继续使用或推荐？';
+  const mvp = '必须做：解决一个核心痛点的最小功能。\n暂不做：账号体系、复杂配置、完整自动化、非验证必需功能。\n判断标准：目标用户是否愿意试用、是否能完成关键动作、是否愿意继续反馈。';
 
   return {
-    title: isProductionFlow ? '生产流程 SOP' : isEfficiencyFlow ? 'AI 提效流程 SOP' : '每日执行 SOP',
-    content: isProductionFlow
-      ? [
-          '1. 找到 1 个参考对象，只拆结构，不复制内容。',
-          '2. 提取它的顺序、节奏、变量和可替换元素。',
-          '3. 把变量替换成自己的目标、素材和表达重点。',
-          '4. 生成脚本，再拆成分镜或步骤。',
-          '5. 整理已有素材和缺失素材。',
-          '6. 执行第一版，结束后记录哪里卡住。',
-        ].join('\n')
-      : isEfficiencyFlow
-        ? [
-            '1. 输入已有材料，让 AI 提取结构和不清楚的地方。',
-            '2. 让 AI 生成 2-3 个改写或整理方向。',
-            '3. 人工选择最贴近目标对象的一版。',
-            '4. 让 AI 按检查清单指出缺口。',
-            '5. 人工补充真实证据、过程和判断。',
-            '6. 输出一版可交付内容，并记录下一轮要改哪里。',
-          ].join('\n')
-      : [
-          '1. 收集今天所有任务，先不排序。',
-          '2. 给每个任务标注截止时间、影响程度、依赖关系。',
-          '3. 选出 1 个主任务和 2 个次任务。',
-          '4. 给主任务安排一个完整时间块。',
-          '5. 每完成一步记录输出物。',
-          '6. 结束前写下明天的入口任务。',
-        ].join('\n'),
+    usableOutput: {
+      title: '产品验证方案 / MVP 范围第一版',
+      sections: normalizeSections([
+        { heading: '核心假设拆解', content: '1. 痛点假设：目标用户真的有这个问题。\n2. 替代方案假设：他们现在的解决方式不够好。\n3. MVP 假设：第一版只解决一个关键动作也有人愿意试。\n4. 持续使用假设：用户愿意再次使用或推荐。' },
+        { heading: '目标用户', content: '先选择最容易接触的 5-8 个目标用户。不要泛泛找“所有人”，而是找最近 30 天内真实遇到过这个问题的人。' },
+        { heading: '访谈问题', content: interview },
+        { heading: 'MVP 功能范围', content: mvp },
+        { heading: '验证指标', content: '- 至少 5 次有效访谈。\n- 至少 3 人有近期真实案例。\n- 至少 2 人愿意试用最小版本。\n- 能明确说出一个最该做的 MVP 功能。' },
+        { heading: '两周执行计划', content: '第 1-2 天：确定目标用户和访谈名单。\n第 3-6 天：完成 5-8 次访谈。\n第 7-9 天：整理痛点和替代方案。\n第 10-12 天：定义 MVP 范围。\n第 13-14 天：判断继续、缩小或换方向。' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '用户访谈问题', content: interview },
+      { title: 'MVP 范围清单', content: mvp },
+      { title: '两周执行计划', content: '第1-2天：找人\n第3-6天：访谈\n第7-9天：整理\n第10-12天：定 MVP\n第13-14天：做判断' },
+    ],
+    nextRefinementPrompt: '例如：目标用户是刚开始做自媒体的人，我已经有 3 个竞品截图。',
   };
 }
 
-function buildScriptTemplate(): CopyableTemplate {
+function renderMetricAnalysis(): RenderedDeliverables {
+  const metricTable = table(
+    ['指标', '当前变化', '对比周期', '异常区间', '影响范围', '可能原因', '验证方式', '下一步建议'],
+    [
+      ['DAU', '【上升/下降】', '本周 vs 上周', '【日期】', '活跃规模', '渠道、活动、入口变化', '按渠道和日期拆分', '确认流量来源'],
+      ['转化率', '【变化比例】', '本期 vs 上期', '【漏斗环节】', '目标动作', '页面、价格、流程、用户质量', '看漏斗掉点', '找最大掉点环节'],
+      ['留存', '【次日/7日变化】', 'cohort 对比', '【用户批次】', '长期价值', '新用户质量、体验、需求不匹配', '分 cohort 对比', '看新老用户差异'],
+      ['订单量', '【变化趋势】', '本期 vs 上期', '【时间段】', '业务结果', '流量、转化、客单、供给', '拆成流量 x 转化', '定位前端还是后端问题'],
+    ]
+  );
+  const summary = '本次指标变化的核心结论是【结论】。\n主要异常出现在【指标 / 人群 / 时间段】。\n目前更可能的原因是【原因】，证据是【证据】。\n仍需验证的是【待验证项】。\n下一步建议先做【动作】，观察【指标】是否变化。';
+
   return {
-    title: '脚本模板',
-    content: [
-      '开头：我现在要解决【具体问题】，最关键的是【判断标准】。',
-      '展开：先展示【现状 / 参考 / 材料】，再说明【处理方法】。',
-      '证据：这里放【数据 / 过程 / 对比 / 示例】。',
-      '结尾：下一步我会先完成【最小动作】，用【检查标准】判断是否有效。',
-      '可替换变量：【对象】、【问题】、【方法】、【证据】、【行动】。',
-    ].join('\n'),
+    usableOutput: {
+      title: '业务指标分析结论 / 异常解释表第一版',
+      sections: normalizeSections([
+        { heading: '指标变化表', content: metricTable },
+        { heading: '异常解释表', content: metricTable },
+        { heading: '影响范围', content: '分别判断异常影响的是流量入口、转化链路、留存质量还是最终订单结果。不要只看一个总数，要拆到时间段、人群或渠道。' },
+        { heading: '验证方式', content: '- 按日期拆分，确认异常从哪一天开始。\n- 按渠道/人群拆分，确认是否集中在某类用户。\n- 对照产品、活动、投放、价格或流程变更时间点。\n- 用漏斗或 cohort 验证解释是否成立。' },
+        { heading: '汇报结论模板', content: summary },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '指标变化表', content: metricTable },
+      { title: '异常解释表', content: metricTable },
+      { title: '汇报结论模板', content: summary },
+    ],
+    nextRefinementPrompt: '例如：转化率从 12% 降到 8%，主要发生在新用户和移动端。',
   };
 }
 
-function buildStoryboardTemplate(): CopyableTemplate {
+function renderRiskPlan(): RenderedDeliverables {
+  const riskTable = table(
+    ['风险点', '影响范围', '触发条件', '预防动作', '回滚方案'],
+    [
+      ['线上用户受影响', '核心流程', '错误率超过阈值', '灰度发布、保留旧入口', '立即切回旧流程'],
+      ['接口兼容问题', '前端/后端/第三方', '返回字段不一致', '先做兼容层和联调清单', '恢复旧接口调用'],
+      ['数据或会话异常', '用户状态/历史记录', 'session 异常', '上线前跑核心路径', '回滚 session 改动'],
+      ['改动范围失控', '排期和测试', '临时加入非核心需求', '冻结第一版范围', '拆到下一版'],
+    ]
+  );
+  const note = '这次改造的目标是【目标】。\n第一版范围只包括【范围】，暂不处理【不做内容】。\n主要风险是【风险1】和【风险2】，我们会通过【灰度 / 回滚 / 监控】控制。\n需要团队配合的是【配合事项】。';
+
   return {
-    title: '分镜 / 步骤表',
-    content: [
-      '| 编号 | 画面或动作 | 文字说明 | 所需素材 | 备注 |',
-      '| --- | --- | --- | --- | --- |',
-      '| 1 | 展示问题 | 为什么要做这件事 | 现状素材 | 开头要短 |',
-      '| 2 | 展示参考或输入 | 说明可借鉴结构 | 参考素材 | 只拆结构 |',
-      '| 3 | 展示自己的版本 | 替换成自己的内容 | 自有素材 | 对应一个信息点 |',
-      '| 4 | 展示结果 | 让人看到第一版成果 | 成果素材 | 可以继续改 |',
-    ].join('\n'),
+    usableOutput: {
+      title: '改造方案 / 风险计划第一版',
+      sections: normalizeSections([
+        { heading: '改造目标', content: '明确这次改造要解决什么问题、影响哪些对象、第一版做到什么程度。' },
+        { heading: '任务拆解', content: table(['阶段', '任务', '依赖', '完成标准'], [['准备', '确认范围和风险', '需求说明', '范围冻结'], ['实施', '完成核心改动', '代码/配置', '核心路径可跑'], ['验证', '灰度和回归', '测试环境', '可回滚']]) },
+        { heading: '风险清单', content: riskTable },
+        { heading: '灰度 / 回滚检查', content: '- [ ] 是否保留旧入口。\n- [ ] 是否有监控指标。\n- [ ] 是否明确回滚触发条件。\n- [ ] 是否知道谁负责决策。' },
+        { heading: '团队说明文案', content: note },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '风险清单', content: riskTable },
+      { title: '团队说明文案', content: note },
+    ],
+    nextRefinementPrompt: '例如：这次改造影响登录链路，计划先灰度 10% 用户。',
   };
 }
 
-function buildAssetTemplate(): CopyableTemplate {
+function renderExperienceRewrite(): RenderedDeliverables {
+  const star = '背景：在【项目 / 课程 / 实习】中，我面对【具体问题】。\n任务：我负责【具体职责】，需要完成【交付物】。\n行动：我通过【方法 / 工具 / 协作】完成了【关键动作】。\n结果：最终产出【结果】，带来【反馈 / 数据 / 质量提升】。\n能力证明：这段经历体现了我的【岗位相关能力】。';
+  const rewrite = '我在【项目名称】中负责【个人职责】，目标是解决【具体问题】。\n我通过【方法/工具】完成了【关键动作】，并产出【交付物】。\n最终结果是【结果/反馈/数据】，这段经历体现了我的【岗位相关能力】。';
+
   return {
-    title: '素材清单',
-    content: [
-      '| 素材 | 类型 | 对应模块 | 当前状态 | 补充方式 |',
-      '| --- | --- | --- | --- | --- |',
-      '|  | 文字 / 图片 / 数据 / 参考 |  | 已有 / 缺失 | 自己补 / 询问 / AI 初稿 |',
-    ].join('\n'),
+    usableOutput: {
+      title: '项目经历优化方案第一版',
+      sections: normalizeSections([
+        { heading: '项目经历诊断', content: '如果只写“做了品牌设计、海报设计、UI设计”，会像任务列表。需要补出目标、个人动作、方法和结果。' },
+        { heading: 'STAR 改写模板', content: star },
+        { heading: '可替换项目描述', content: rewrite },
+        { heading: '量化结果补充清单', content: '- 项目周期：用了多久？\n- 产出规模：多少页面 / 海报 / 方案 / 组件？\n- 反馈结果：老师、用户、同事怎么评价？\n- 效率变化：是否更快、更清晰、更稳定？\n- 对比证明：修改前后有什么差异？' },
+        { heading: '投递前检查清单', content: '- [ ] 是否出现目标岗位关键词。\n- [ ] 是否说明个人贡献，而不是团队泛描述。\n- [ ] 是否有结果或反馈。\n- [ ] 是否避免“负责相关工作”这种空话。\n- [ ] 是否能被招聘方快速看懂。' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: 'STAR 项目经历模板', content: star },
+      { title: '可替换项目描述', content: rewrite },
+      { title: '量化结果补充清单', content: '周期：\n规模：\n反馈：\n效率：\n对比：' },
+    ],
+    nextRefinementPrompt: '例如：目标岗位是 UI 设计，我有 1 个实习项目和 3 个课程项目。',
   };
 }
 
-function buildChecklistTemplate(): CopyableTemplate {
+function renderProjectRetrospective(): RenderedDeliverables {
+  const record = table(
+    ['项目名称', '当时目标', '做了什么', '结果如何', '学到什么', '下次怎么改'],
+    [['【项目】', '【目标】', '【动作】', '【结果】', '【经验】', '【改进】']]
+  );
+
   return {
-    title: '检查清单',
-    content: [
-      '- [ ] 目标一句话说清了吗？',
-      '- [ ] 接收方或使用对象明确了吗？',
-      '- [ ] 每个模块都有具体内容，而不是只有标题吗？',
-      '- [ ] 至少有一个字段表、段落、脚本或 SOP 可以复制吗？',
-      '- [ ] 缺失信息是否用【占位符】标出？',
-      '- [ ] 下一步动作是否能在今天执行？',
-    ].join('\n'),
+    usableOutput: {
+      title: '项目复盘结构 / 经验整理表第一版',
+      sections: normalizeSections([
+        { heading: '项目复盘结构', content: '按“目标 - 行动 - 结果 - 经验 - 下次改进”整理，重点服务经验沉淀和下一次改进。' },
+        { heading: '项目记录表', content: record },
+        { heading: '经验总结问题', content: '1. 当时真正想达成什么？\n2. 哪个判断后来证明是对的？\n3. 哪个动作最浪费时间？\n4. 如果重做一次，第一步会怎么改？' },
+        { heading: '下次改进清单', content: '- [ ] 下次开始前先写目标。\n- [ ] 每周记录关键决策。\n- [ ] 保留过程材料。\n- [ ] 项目结束后 24 小时内复盘。' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '项目复盘记录表', content: record },
+      { title: '经验总结问题', content: '我当时的目标是：\n我做了：\n结果是：\n我学到：\n下次我会：' },
+    ],
+    nextRefinementPrompt: '例如：我想复盘 3 个课程项目，重点看哪里拖慢了进度。',
   };
 }
 
-function buildCopyableTemplates(frame: ProblemFrame, contract: OutputContract): CopyableTemplate[] {
-  const templates: CopyableTemplate[] = [];
+function renderClarificationFlow(): RenderedDeliverables {
+  const clarifyTable = table(
+    ['问题分类', '当前表现', '10分钟要写下什么', '今晚最小动作'],
+    [
+      ['目标', '不知道想得到什么', '今晚要留下的结果', '选一个最小结果'],
+      ['材料', '不知道手上有什么', '已有 3 条信息', '整理到一处'],
+      ['顺序', '不知道先做哪步', '所有待做事项', '选最容易开始的一步'],
+      ['标准', '不知道做到什么算完成', '一个可检查标准', '做到能被看见即可'],
+    ]
+  );
+  const action = '1. 用 3 分钟写下所有让你乱的事情。\n2. 用 3 分钟圈出最想先解决的一件。\n3. 用 4 分钟写下它的目标、已有材料和下一步。\n4. 今晚只完成一个 20 分钟内能结束的小动作。';
 
-  if (contract.deliverables.some(item => item.type === 'table')) {
-    templates.push(buildFieldTableTemplate());
-  }
+  return {
+    usableOutput: {
+      title: '问题澄清流程 / 下一步行动判断第一版',
+      sections: normalizeSections([
+        { heading: '问题分类', content: '现在信息不足，不适合假装给完整方案。先把混乱拆成目标、材料、顺序、标准四类。' },
+        { heading: '10分钟澄清表', content: clarifyTable },
+        { heading: '今晚最小行动', content: action },
+        { heading: '继续补充问题', content: '补充：最急的一件事、已有材料、今天可用时间、最担心的阻碍。补完后再生成更完整的一版。' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '10分钟澄清表', content: clarifyTable },
+      { title: '今晚最小行动', content: action },
+    ],
+    nextRefinementPrompt: '例如：我今晚只有 40 分钟，最急的是明天要交一份说明。',
+  };
+}
 
-  if (hasAnyNeed(frame, ['计算逻辑', '判断'])) {
-    templates.push(buildCalculationTemplate());
-  }
+function renderGenericDocument(frame: ProblemFrame): RenderedDeliverables {
+  if (hasAny(frame, ['短视频', '视频方案', '分镜', '脚本'])) return renderVideoLike(frame);
+  if (hasAny(frame, ['工作流程很乱', '每天先做什么', '优先级'])) return renderWorkflowLike(frame);
+  if (hasAny(frame, ['财务报表', '报表'])) return renderAnalysisTable(frame);
 
-  if (hasAnyNeed(frame, ['汇报表达', '说明'])) {
-    templates.push(buildReportTemplate(frame));
-  }
+  const neutral = '这份材料想说明的是【核心信息】。\n接收方最需要理解的是【关键结论】。\n目前已有的信息包括【已有材料 / 数据 / 例子】。\n最需要补充的是【证据 / 数据 / 示例】。\n下一步请先检查【最影响理解的一段】是否足够清楚。';
 
-  if (contract.deliverables.some(item => item.type === 'diagnosis' || item.type === 'document')) {
-    templates.push(buildDocumentTemplate());
-  }
+  return {
+    usableOutput: {
+      title: `${frame.centerOutput.name}第一版`,
+      sections: normalizeSections([
+        { heading: '第一版成果', content: '先把目标、对象、已有材料、完成标准写清楚，再进入改写或制作。' },
+        { heading: '可复制模板', content: neutral },
+        { heading: '检查清单', content: genericChecklist() },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '可复制模板', content: neutral },
+      { title: '检查清单', content: genericChecklist() },
+    ],
+    nextRefinementPrompt: '例如：这份材料给谁看、现在有哪些内容、你希望改成什么效果。',
+  };
+}
 
-  if (contract.deliverables.some(item => item.type === 'outline')) {
-    templates.push(buildStructureTemplate());
-  }
+function renderVideoLike(frame: ProblemFrame): RenderedDeliverables {
+  const breakdown = table(
+    ['环节', '时长', '画面内容', '字幕 / 口播', '镜头类型', '可替换元素', '我的版本怎么改'],
+    [['开头', '0-3秒', '抛出问题', '【痛点句】', '特写/字幕卡', '问题对象', '换成自己的场景'], ['展开', '3-30秒', '展示过程', '【步骤说明】', '过程镜头', '素材', '换成已有素材'], ['结尾', '最后5秒', '展示结果', '【行动引导】', '结果镜头', '行动', '换成自己的目标']]
+  );
+  const script = '开头 3 秒：我想解决【具体问题】，但现在卡在【卡点】。\n中段展开：我先参考【参考对象】，拆出【结构】，再替换成【自己的内容】。\n画面展示：依次展示【素材1】、【素材2】、【过程】。\n结尾行动：如果你也想做，可以先用这个模板完成第一版。';
+  const storyboard = table(['镜头编号', '画面', '口播 / 字幕', '素材需求', '备注'], [['1', '问题画面', '我现在想做...', '现状素材', '短'], ['2', '参考拆解', '这个模板分成...', '参考截图', '只拆结构'], ['3', '我的版本', '我替换成...', '已有素材', '突出变化']]);
+  const assets = table(['素材', '类型', '对应镜头', '当前状态', '补充方式'], [['【素材名】', '文字/图片/视频', '镜头1', '已有/缺失', '补拍/AI初稿/查找']]);
+  const flow = '找参考视频 → 拆解模板 → 提取结构 → 替换成自己的内容 → 生成脚本 → 生成分镜 → 整理素材 → 拍摄/生成画面 → 剪辑 → 复盘 → 更新模板库。';
 
-  if (contract.deliverables.some(item => item.type === 'workflow')) {
-    templates.push(buildWorkflowTemplate(frame));
-  }
+  return {
+    usableOutput: {
+      title: `${frame.centerOutput.name}第一版`,
+      sections: normalizeSections([
+        { heading: '参考拆解框架', content: breakdown },
+        { heading: '脚本结构', content: script },
+        { heading: '分镜结构', content: storyboard },
+        { heading: '素材整理清单', content: assets },
+        { heading: '生产流程', content: flow },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '短视频模板拆解表', content: breakdown },
+      { title: '30-60 秒脚本模板', content: script },
+      { title: '分镜表', content: storyboard },
+      { title: '素材清单', content: assets },
+      { title: '短视频生产 SOP', content: flow },
+    ],
+    nextRefinementPrompt: '例如：参考视频是口播混剪，我手上有 8 段素材，想先做 45 秒版本。',
+  };
+}
 
-  if (contract.deliverables.some(item => item.type === 'script')) {
-    templates.push(buildScriptTemplate());
-  }
+function renderWorkflowLike(frame: ProblemFrame): RenderedDeliverables {
+  const flow = table(
+    ['步骤', '输入物', '操作', '输出物', '完成标准 / 检查点'],
+    [
+      ['1', '所有待处理事项', '收集任务池，不先判断重要性', '完整任务列表', '没有遗漏明显任务'],
+      ['2', '任务列表', '标记截止时间、影响程度、依赖关系', '优先级标签', '知道哪些必须今天处理'],
+      ['3', '优先级标签', '选出 1 个主任务 + 2 个次任务', '今日执行清单', '今天不再反复选择'],
+      ['4', '今日执行清单', '安排时间块和检查点', '时间块计划', '每个任务有开始和结束标准'],
+      ['5', '当天执行结果', '结束前记录完成、卡点、明天入口', '复盘记录', '明天能接着推进'],
+    ]
+  );
+  const sop = '收集任务 → 标记优先级 → 选出今日主线 → 安排时间块 → 执行 → 复盘 → 更新下一步。';
 
-  if (contract.deliverables.some(item => item.title.includes('分镜'))) {
-    templates.push(buildStoryboardTemplate());
-  }
+  return {
+    usableOutput: {
+      title: `${frame.centerOutput.name}第一版`,
+      sections: normalizeSections([
+        { heading: '执行流程', content: flow },
+        { heading: '优先级规则', content: '先做有截止时间、会影响别人、会阻塞后续步骤的任务；再做能产出可见结果的任务；最后处理可以批量化或延后的任务。' },
+        { heading: '每日执行 SOP', content: sop },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '每日执行 SOP', content: sop },
+      { title: '优先级表', content: flow },
+    ],
+    nextRefinementPrompt: '例如：我每天有 6 个任务，其中 2 个有截止时间，1 个需要等别人反馈。',
+  };
+}
 
-  if (contract.deliverables.some(item => item.title.includes('素材'))) {
-    templates.push(buildAssetTemplate());
-  }
-
-  templates.push(buildChecklistTemplate());
-
-  const seen = new Set<string>();
-  return templates.filter(template => {
-    if (seen.has(template.title)) return false;
-    seen.add(template.title);
-    return true;
-  });
+function renderByContract(frame: ProblemFrame, contractId: OutputContractId): RenderedDeliverables {
+  if (contractId === 'message_draft') return renderMessageDraft();
+  if (contractId === 'research_report') return renderResearchReport();
+  if (contractId === 'analysis_table') return renderAnalysisTable(frame);
+  if (contractId === 'rubric_assignment') return renderRubricAssignment();
+  if (contractId === 'rubric_self_assessment') return renderRubricSelfAssessment();
+  if (contractId === 'validation_plan') return renderValidationPlan();
+  if (contractId === 'metric_analysis') return renderMetricAnalysis();
+  if (contractId === 'risk_plan') return renderRiskPlan();
+  if (contractId === 'experience_rewrite') return renderExperienceRewrite();
+  if (contractId === 'project_retrospective') return renderProjectRetrospective();
+  if (contractId === 'clarification_flow') return renderClarificationFlow();
+  return renderGenericDocument(frame);
 }
 
 export function renderDeliverables(frame: ProblemFrame, contract: OutputContract): RenderedDeliverables {
-  return {
-    usableOutput: {
-      title: contract.title,
-      sections: contract.deliverables.map((deliverable, index) => ({
-        heading: `${index + 1}. ${deliverable.title}`,
-        content: renderSection(frame, deliverable),
-      })),
-    },
-    copyableTemplates: buildCopyableTemplates(frame, contract),
-    nextRefinementPrompt: frame.missingInfo.length > 0
-      ? `例如：补充${frame.missingInfo.slice(0, 3).join('、')}，FutureLens 可以继续把字段、段落、步骤和检查标准改得更具体。`
-      : '例如：补充真实使用对象、已有材料和格式要求，FutureLens 可以继续把这版成果改得更具体。',
-  };
+  return renderByContract(frame, contract.contractId);
 }

@@ -1,4 +1,6 @@
-import type { ProblemFrame } from './problemFrameEngine';
+import type { SolutionResult } from '@/types/radar';
+import type { OutputContractId, ProblemFrame } from './problemFrameEngine';
+import { getOutputContractSchema, type OutputContractSchema } from './outputContractSchemas';
 
 export type DeliverableType =
   | 'table'
@@ -11,9 +13,23 @@ export type DeliverableType =
   | 'outline'
   | 'diagnosis'
   | 'plan'
+  | 'research_report'
+  | 'analysis_table'
+  | 'rubric'
+  | 'rubric_assignment'
+  | 'rubric_self_assessment'
+  | 'validation_plan'
+  | 'metric_analysis'
+  | 'risk_plan'
+  | 'experience_rewrite'
+  | 'project_retrospective'
+  | 'clarification_flow'
+  | 'generic_document'
   | 'mixed';
 
 export type OutputContract = {
+  contractId: OutputContractId;
+  schema: OutputContractSchema;
   title: string;
   deliverables: Array<{
     id: string;
@@ -22,6 +38,7 @@ export type OutputContract = {
     purpose: string;
     contentRules: string[];
     suggestedSections: string[];
+    requiredSlots: string[];
   }>;
   copyableBlocks: Array<{
     title: string;
@@ -38,242 +55,174 @@ export type OutputContract = {
     adjust: string;
   }>;
   mustAvoidAssumptions: string[];
+  qualityRules: string[];
 };
 
-function has(frame: ProblemFrame, value: string): boolean {
-  return frame.rawProblem.includes(value) || frame.transformationNeeded.some(item => item.includes(value));
+export type OutputQualityCheck = {
+  passed: boolean;
+  missingSections: string[];
+  missingCopyables: string[];
+  missingSlots: string[];
+  forbiddenTerms: string[];
+  duplicateSectionHeadings: string[];
+  duplicateCopyableTitles: string[];
+  hasFallbackTitle: boolean;
+};
+
+function deliverableTypeForSection(contractId: OutputContractId, section: string): DeliverableType {
+  if (contractId === 'message_draft') return section.includes('消息') || section.includes('版本') ? 'message' : 'document';
+  if (contractId === 'research_report') return section.includes('清单') ? 'checklist' : 'research_report';
+  if (contractId === 'analysis_table') return section.includes('动作') ? 'plan' : 'analysis_table';
+  if (contractId === 'rubric_assignment') return section.includes('评分') ? 'rubric_assignment' : section.includes('清单') ? 'checklist' : 'document';
+  if (contractId === 'rubric_self_assessment') return section.includes('表') || section.includes('等级') ? 'rubric_self_assessment' : 'checklist';
+  if (contractId === 'validation_plan') return section.includes('访谈') ? 'message' : section.includes('计划') ? 'plan' : 'validation_plan';
+  if (contractId === 'metric_analysis') return section.includes('模板') ? 'document' : 'metric_analysis';
+  if (contractId === 'risk_plan') return section.includes('文案') ? 'document' : section.includes('清单') ? 'risk_plan' : 'workflow';
+  if (contractId === 'experience_rewrite') return section.includes('模板') || section.includes('描述') ? 'experience_rewrite' : 'checklist';
+  if (contractId === 'project_retrospective') return section.includes('表') ? 'table' : 'document';
+  if (contractId === 'clarification_flow') return section.includes('表') ? 'clarification_flow' : 'workflow';
+  if (section.includes('表')) return 'table';
+  if (section.includes('流程') || section.includes('SOP')) return 'workflow';
+  if (section.includes('脚本')) return 'script';
+  if (section.includes('清单')) return 'checklist';
+  return 'generic_document';
 }
 
-function createDeliverable(
-  id: string,
-  type: DeliverableType,
-  title: string,
-  purpose: string,
-  contentRules: string[],
-  suggestedSections: string[]
-): OutputContract['deliverables'][number] {
-  return { id, type, title, purpose, contentRules, suggestedSections };
+function copyableTypeForTitle(title: string): OutputContract['copyableBlocks'][number]['type'] {
+  if (title.includes('表')) return 'table';
+  if (title.includes('消息')) return 'message';
+  if (title.includes('脚本')) return 'script';
+  if (title.includes('清单') || title.includes('行动')) return 'checklist';
+  if (title.includes('结构')) return 'outline';
+  return 'template';
 }
 
-function buildDeliverables(frame: ProblemFrame): OutputContract['deliverables'] {
-  const items: OutputContract['deliverables'] = [];
-
-  if (frame.centerOutput.outputType === 'table' || has(frame, '字段设计')) {
-    items.push(
-      createDeliverable(
-        'deliverable-fields',
-        'table',
-        '字段结构',
-        '把中心产出拆成可填写、可检查的字段。',
-        ['字段必须有名称、用途和示例', '不要默认套用具体行业字段，除非用户原文提到'],
-        ['字段名称', '用途', '示例', '检查方式']
-      ),
-      createDeliverable(
-        'deliverable-logic',
-        'checklist',
-        '计算 / 判断逻辑',
-        '说明每个关键字段如何计算、判断或解释。',
-        ['写清计算关系或判断标准', '标记异常或不确定项'],
-        ['输入项', '处理逻辑', '输出结果', '异常说明']
-      )
-    );
-  }
-
-  if (frame.centerOutput.outputType === 'workflow' || has(frame, '形成流程') || has(frame, '流程化')) {
-    items.push(
-      createDeliverable(
-        'deliverable-workflow',
-        'workflow',
-        '执行流程',
-        '把问题变成可重复执行的步骤。',
-        ['步骤必须有顺序', '每一步要有输入和输出', '避免只写抽象建议'],
-        ['入口', '步骤', '检查点', '输出物']
-      )
-    );
-  }
-
-  if (has(frame, '效率流程') && !items.some(item => item.id === 'deliverable-efficiency-workflow')) {
-    items.push(
-      createDeliverable(
-        'deliverable-efficiency-workflow',
-        'workflow',
-        '效率流程',
-        '把重复修改、生成、检查的动作变成可复用流程。',
-        ['每一步要说明输入、操作和输出', '标出哪些步骤适合交给 AI 生成初稿或检查'],
-        ['输入材料', 'AI 辅助动作', '人工判断点', '输出物', '检查标准']
-      )
-    );
-  }
-
-  if (frame.centerOutput.outputType === 'script' || has(frame, '生成脚本')) {
-    items.push(
-      createDeliverable(
-        'deliverable-script',
-        'script',
-        '脚本结构',
-        '把表达内容变成可以替换变量的脚本。',
-        ['包含开头、中段、结尾', '标出可替换变量', '能直接复制后改写'],
-        ['开头', '展开', '证据或画面', '结尾行动', '可替换变量']
-      )
-    );
-  }
-
-  if (has(frame, '生成分镜')) {
-    items.push(
-      createDeliverable(
-        'deliverable-storyboard',
-        'outline',
-        '分镜结构',
-        '把内容拆成可以执行或继续生成的画面 / 步骤结构。',
-        ['每个分镜要对应一个信息点', '标明需要的素材或输入'],
-        ['编号', '画面或步骤', '文字说明', '所需素材', '备注']
-      )
-    );
-  }
-
-  if (frame.centerOutput.outputType === 'document' || has(frame, '改写') || has(frame, '诊断')) {
-    items.push(
-      createDeliverable(
-        'deliverable-diagnosis',
-        'diagnosis',
-        '结构诊断',
-        '先判断现有表达或初始想法哪里不清楚。',
-        ['只指出会影响理解或使用的问题', '不要默认具体场景身份'],
-        ['问题点', '影响', '修改方向']
-      ),
-      createDeliverable(
-        'deliverable-rewrite',
-        'document',
-        '可替换片段',
-        '给出一段可以直接替换或作为初版的表达。',
-        ['保留用户真实意图', '用占位符承接缺失信息'],
-        ['目标', '内容结构', '示例表达']
-      )
-    );
-  }
-
-  if (has(frame, '结构整理') || has(frame, '明确表达结构')) {
-    items.push(
-      createDeliverable(
-        'deliverable-structure',
-        'outline',
-        '结构框架',
-        '把中心产出整理成别人能看懂的顺序。',
-        ['先说明目标，再展开内容，最后给出下一步', '不要默认具体身份或行业'],
-        ['目标', '核心内容', '证明或材料', '下一步']
-      )
-    );
-  }
-
-  if (has(frame, '项目说明') || has(frame, '生成初版材料')) {
-    items.push(
-      createDeliverable(
-        'deliverable-document',
-        'document',
-        '初版表达材料',
-        '把想法或已有内容变成可以展示、讨论或继续修改的版本。',
-        ['用用户原文中的对象和目标', '缺失信息用占位符标记'],
-        ['背景', '目标', '内容', '证据或依据', '待补充']
-      )
-    );
-  }
-
-  if (has(frame, '拆解参考')) {
-    items.push(
-      createDeliverable(
-        'deliverable-reference',
-        'outline',
-        '参考拆解框架',
-        '把参考对象拆成可复用结构，而不是照抄内容。',
-        ['只提取结构、节奏、变量和可替换元素', '标明自己的版本如何替换'],
-        ['参考结构', '可复用规则', '我的替换版本']
-      )
-    );
-  }
-
-  if (has(frame, '整理素材')) {
-    items.push(
-      createDeliverable(
-        'deliverable-assets',
-        'checklist',
-        '素材整理清单',
-        '把已有材料或素材映射到最终交付物的不同部分。',
-        ['区分已有、缺失、需要补充', '每个素材对应一个用途'],
-        ['已有素材', '缺失素材', '补充方式', '使用位置']
-      )
-    );
-  }
-
-  if (has(frame, '检查清单') || has(frame, '检查可理解性')) {
-    items.push(
-      createDeliverable(
-        'deliverable-checklist',
-        'checklist',
-        '检查清单',
-        '确认第一版成果是否足够清楚、完整、可继续推进。',
-        ['只检查会影响使用的关键项', '把不确定内容转成待补充项'],
-        ['是否看得懂', '是否能使用', '是否缺材料', '下一步改哪里']
-      )
-    );
-  }
-
-  if (items.length === 0) {
-    items.push(
-      createDeliverable(
-        'deliverable-first-version',
-        'mixed',
-        '第一版成果',
-        '先把问题变成可以给别人看或自己执行的初版。',
-        ['明确目标', '拆成结构', '留下可继续修改的版本'],
-        ['目标', '结构', '第一版内容', '下一步检查']
-      )
-    );
-  }
-
-  return items;
+function buildDeliverables(frame: ProblemFrame, schema: OutputContractSchema): OutputContract['deliverables'] {
+  return schema.requiredSections.map((section, index) => ({
+    id: `${schema.id}-section-${index + 1}`,
+    type: deliverableTypeForSection(schema.id, section),
+    title: section,
+    purpose: `生成「${section}」，使「${frame.centerOutput.name}」满足 ${schema.label} 的成果契约。`,
+    contentRules: [
+      ...schema.qualityRules,
+      `必须体现这些槽位：${schema.requiredSlots.join(' / ')}`,
+      '不能只给抽象建议，要给字段、步骤、段落或检查项。',
+    ],
+    suggestedSections: [section],
+    requiredSlots: schema.requiredSlots,
+  }));
 }
 
-function buildCopyableBlocks(deliverables: OutputContract['deliverables']): OutputContract['copyableBlocks'] {
-  const blocks = deliverables.map(item => {
-    const type =
-      item.type === 'table' ? 'table'
-      : item.type === 'script' ? 'script'
-      : item.type === 'workflow' ? 'checklist'
-      : item.type === 'message' ? 'message'
-      : item.type === 'outline' ? 'outline'
-      : 'template';
+function buildCopyableBlocks(schema: OutputContractSchema): OutputContract['copyableBlocks'] {
+  return schema.requiredCopyables.map(title => ({
+    title,
+    type: copyableTypeForTitle(title),
+    required: true,
+  }));
+}
 
-    return {
-      title: item.title,
-      type,
-      required: item.id === 'deliverable-first-version' || item.id === 'deliverable-fields' || item.id === 'deliverable-workflow',
-    } satisfies OutputContract['copyableBlocks'][number];
+function duplicateItems(values: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return Array.from(duplicates);
+}
+
+function sourceContains(sourceText: string, term: string): boolean {
+  return sourceText.includes(term);
+}
+
+export function validateAgainstContract(
+  result: Pick<SolutionResult, 'usableOutput' | 'copyableTemplates'>,
+  schema: OutputContractSchema,
+  sourceText: string
+): OutputQualityCheck {
+  const sectionHeadings = result.usableOutput.sections.map(section => section.heading.replace(/^\d+\.\s*/, ''));
+  const copyableTitles = result.copyableTemplates.map(template => template.title);
+  const fullText = [
+    result.usableOutput.title,
+    ...result.usableOutput.sections.flatMap(section => [section.heading, section.content]),
+    ...result.copyableTemplates.flatMap(template => [template.title, template.content]),
+  ].join('\n');
+
+  const missingSections = schema.requiredSections.filter(required =>
+    !sectionHeadings.some(heading => heading.includes(required) || required.includes(heading))
+  );
+  const missingCopyables = schema.requiredCopyables.filter(required =>
+    !copyableTitles.some(title => title.includes(required) || required.includes(title))
+  );
+  const missingSlots = schema.requiredSlots.filter(slot => !fullText.includes(slot));
+  const forbiddenTerms = (schema.forbiddenTerms ?? []).filter(term => {
+    if (!fullText.includes(term)) return false;
+    if (schema.allowForbiddenTermsIfSourceMentions && sourceContains(sourceText, term)) return false;
+    return true;
   });
+  const duplicateSectionHeadings = duplicateItems(sectionHeadings);
+  const duplicateCopyableTitles = duplicateItems(copyableTitles);
+  const hasFallbackTitle = fullText.includes('可展示方案 / 初版表达材料');
 
-  if (!blocks.some(item => item.type === 'checklist')) {
-    blocks.push({ title: '检查清单', type: 'checklist', required: true });
-  }
-
-  return blocks;
+  return {
+    passed:
+      missingSections.length === 0 &&
+      missingCopyables.length === 0 &&
+      forbiddenTerms.length === 0 &&
+      duplicateSectionHeadings.length === 0 &&
+      duplicateCopyableTitles.length === 0 &&
+      !hasFallbackTitle,
+    missingSections,
+    missingCopyables,
+    missingSlots,
+    forbiddenTerms,
+    duplicateSectionHeadings,
+    duplicateCopyableTitles,
+    hasFallbackTitle,
+  };
 }
 
 export function buildOutputContract(frame: ProblemFrame): OutputContract {
-  const deliverables = buildDeliverables(frame);
-  const copyableBlocks = buildCopyableBlocks(deliverables);
+  const contractId = frame.contractId ?? 'generic_document';
+  const baseSchema = getOutputContractSchema(contractId);
+  const schema = contractId === 'generic_document'
+    ? {
+        ...baseSchema,
+        requiredSections:
+          frame.centerOutput.outputType === 'workflow'
+            ? ['执行流程', '优先级规则', '每日执行 SOP']
+            : frame.centerOutput.outputType === 'mixed' && frame.transformationNeeded.some(item => item.includes('分镜') || item.includes('素材'))
+              ? ['参考拆解框架', '脚本结构', '分镜结构', '素材整理清单', '生产流程']
+              : frame.centerOutput.outputType === 'table'
+                ? ['数据字段表', '原因判断维度', '反馈 / 数据分类表', '可能原因', '下一步调整动作']
+                : baseSchema.requiredSections,
+        requiredCopyables:
+          frame.centerOutput.outputType === 'workflow'
+            ? ['每日执行 SOP', '优先级表']
+            : frame.centerOutput.outputType === 'mixed' && frame.transformationNeeded.some(item => item.includes('分镜') || item.includes('素材'))
+              ? ['短视频模板拆解表', '30-60 秒脚本模板', '分镜表', '素材清单', '短视频生产 SOP']
+              : frame.centerOutput.outputType === 'table'
+                ? ['分析字段表', '原因判断表', '下一步调整动作']
+                : baseSchema.requiredCopyables,
+      }
+    : baseSchema;
+  const deliverables = buildDeliverables(frame, schema);
 
   return {
+    contractId,
+    schema,
     title: `${frame.centerOutput.name}第一版`,
     deliverables,
-    copyableBlocks,
-    clarificationQuestions: frame.missingInfo.slice(0, 3).map(item => ({
-      question: `${item}是什么？`,
-      reason: '这会影响第一版成果是否贴近真实使用场景。',
+    copyableBlocks: buildCopyableBlocks(schema),
+    clarificationQuestions: schema.requiredSlots.slice(0, 3).map(slot => ({
+      question: `${slot}是什么？`,
+      reason: '这会影响成果是否贴近真实使用场景。',
       affects: frame.centerOutput.name,
     })),
     refinementRules: [
       {
         ifUserAdds: '补充目标对象或使用场景',
-        adjust: '调整成果结构和表达重点。',
+        adjust: '调整成果结构、语气和字段重点。',
       },
       {
         ifUserAdds: '补充已有材料或数据',
@@ -286,8 +235,10 @@ export function buildOutputContract(frame: ProblemFrame): OutputContract {
     ],
     mustAvoidAssumptions: [
       '不要默认用户的行业、岗位或身份。',
-      '不要把“材料”默认理解成特定材料类型。',
-      '不要把“工作流”默认理解成每日工作安排，先看中心产出是什么。',
+      '不要把“材料”默认理解成简历或作品集。',
+      '不要把“评分标准”默认理解成教师作业评分，先看受众和对象。',
+      '不要把“数据分析”默认理解成 DAU/留存/转化率，先看数据对象。',
     ],
+    qualityRules: schema.qualityRules,
   };
 }
