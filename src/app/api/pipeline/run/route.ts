@@ -3,6 +3,7 @@ import type { RawNewsItem, NewsSource } from '@/lib/news-pipeline/types';
 import { DEFAULT_SOURCES } from '@/lib/news-pipeline/types';
 import { fetchRSSFeed } from '@/lib/news-pipeline/rss-parser';
 import { translateNewsBatch } from '@/lib/deepseek';
+import { isLegacyFeatureAllowed, LEGACY_DISABLED_ERROR } from '@/lib/legacyAccess';
 
 async function fetchSource(source: NewsSource): Promise<{
   sourceId: string;
@@ -53,6 +54,10 @@ async function fetchSource(source: NewsSource): Promise<{
 }
 
 export async function POST() {
+  if (!isLegacyFeatureAllowed()) {
+    return NextResponse.json({ error: LEGACY_DISABLED_ERROR }, { status: 403 });
+  }
+
   console.log('\n========== [Pipeline] 开始执行 ==========\n');
   const startTime = Date.now();
   const results: Array<{
