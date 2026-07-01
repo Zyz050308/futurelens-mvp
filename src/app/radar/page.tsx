@@ -18,9 +18,16 @@ import {
   parseSolutionWorkspaceState,
   serializeSolutionWorkspaceState,
   summarizeWorkspaceText,
+  updateSolutionWorkspaceActionProgress,
   type SolutionRevisionMode,
   type SolutionWorkspaceState,
 } from '@/lib/solutionWorkspace';
+import {
+  buildActionProgress,
+  updateActionProgress,
+  type ActionProgressState,
+  type ActionStatus,
+} from '@/lib/actionProgressEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
 import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
@@ -1459,6 +1466,86 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
 // V6.5 二级折叠区域：系统分析依据
 // ============================================================
 
+function ActionProgressCard({
+  progress,
+  onUpdate,
+}: {
+  progress: ActionProgressState;
+  onUpdate: (actionId: string, status: ActionStatus) => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-[#D6E6FF] bg-white p-5 shadow-[0_14px_40px_rgba(0,80,180,0.06)] sm:p-6">
+      <div className="mb-3 inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
+        下一步执行清单
+      </div>
+      <h2 className="text-lg font-semibold text-[#111827]">把结果推进成真实动作</h2>
+      <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+        完成或跳过任务后，FutureLens 会根据当前进度给出下一步建议。状态只保存在本机浏览器。
+      </p>
+      <div className="mt-4 space-y-3">
+        {progress.items.map((item, index) => (
+          <div key={item.id} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB] ring-1 ring-[#D6E6FF]">
+                {index + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#111827]">{item.title}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-[#64748B]">{item.why}</p>
+                  </div>
+                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    item.status === 'done'
+                      ? 'bg-[#F4FBF5] text-[#248A3D]'
+                      : item.status === 'skipped'
+                        ? 'bg-[#FFF7ED] text-[#C2410C]'
+                        : 'bg-[#EEF5FF] text-[#2463EB]'
+                  }`}>
+                    {item.status === 'done' ? '已完成' : item.status === 'skipped' ? '已跳过' : '待执行'}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs leading-relaxed text-[#475569] sm:grid-cols-2">
+                  <div className="rounded-xl bg-white p-3 ring-1 ring-[#EEF2F7]">
+                    <div className="font-semibold text-[#111827]">产出</div>
+                    <div className="mt-1">{item.output}</div>
+                  </div>
+                  <div className="rounded-xl bg-white p-3 ring-1 ring-[#EEF2F7]">
+                    <div className="font-semibold text-[#111827]">完成标准</div>
+                    <div className="mt-1">{item.doneCriteria}</div>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onUpdate(item.id, 'done')}
+                    disabled={item.status === 'done'}
+                    className="rounded-full bg-[#111827] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    完成
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdate(item.id, 'skipped')}
+                    disabled={item.status === 'skipped'}
+                    className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#64748B] ring-1 ring-[#D6E6FF] transition-colors hover:bg-[#F8FAFD] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    跳过
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-2xl bg-[#F8FAFD] p-4 text-sm leading-relaxed text-[#1F2937]">
+        <span className="font-semibold text-[#111827]">下一步建议：</span>
+        {progress.nextSuggestion}
+      </div>
+    </section>
+  );
+}
+
 function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result: SolutionResult; profile: FutureProfile; capabilityPlan: CapabilityPlan }) {
   const extendedProfile = profile as FutureProfile & {
     currentSituation?: string;
@@ -1486,6 +1573,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
   const [revisionNote, setRevisionNote] = useState<string | null>(null);
   const [revisionError, setRevisionError] = useState<string | null>(null);
   const [isRevising, setIsRevising] = useState(false);
+  const [actionProgress, setActionProgress] = useState<ActionProgressState>(() => buildActionProgress(result, inferredContractId));
   const suggestions = getRevisionSuggestions(inferredContractId, workspaceResult);
 
   useEffect(() => {
@@ -1500,16 +1588,29 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
       && saved.problemText === problemText
       && (!inferredContractId || !saved.contractId || saved.contractId === inferredContractId)
     ) {
-      setWorkspaceState(saved);
-      setWorkspaceResult(saved.currentResult);
+      const restoredProgress = saved.actionProgress ?? buildActionProgress(saved.currentResult, saved.contractId ?? inferredContractId);
+      const normalizedSaved = saved.actionProgress
+        ? saved
+        : updateSolutionWorkspaceActionProgress(saved, restoredProgress);
+      if (!saved.actionProgress) {
+        window.localStorage.setItem(
+          SOLUTION_WORKSPACE_STORAGE_KEY,
+          serializeSolutionWorkspaceState(normalizedSaved)
+        );
+      }
+      setWorkspaceState(normalizedSaved);
+      setWorkspaceResult(normalizedSaved.currentResult);
+      setActionProgress(restoredProgress);
       return;
     }
 
+    const initialActionProgress = buildActionProgress(result, inferredContractId);
     const nextState = createSolutionWorkspaceState({
       problemText,
       materialSummary,
       contractId: inferredContractId,
       currentResult: result,
+      actionProgress: initialActionProgress,
     });
     window.localStorage.setItem(
       SOLUTION_WORKSPACE_STORAGE_KEY,
@@ -1517,6 +1618,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
     );
     setWorkspaceState(nextState);
     setWorkspaceResult(result);
+    setActionProgress(initialActionProgress);
   }, [baseResultKey, problemText, materialSummary, inferredContractId, result]);
 
   const submitRevision = async (rawInstruction: string, rawMode?: SolutionRevisionMode) => {
@@ -1546,16 +1648,19 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
       }
 
       const nextResult = data.result as SolutionResult;
+      const nextActionProgress = buildActionProgress(nextResult, workspaceState?.contractId ?? inferredContractId);
       const baseState = workspaceState ?? createSolutionWorkspaceState({
         problemText,
         materialSummary,
         contractId: inferredContractId,
         currentResult: workspaceResult,
+        actionProgress,
       });
       const nextState = appendSolutionRevision(baseState, {
         instruction,
         mode,
         result: nextResult,
+        actionProgress: nextActionProgress,
       });
 
       if (typeof window !== 'undefined') {
@@ -1567,6 +1672,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
 
       setWorkspaceResult(nextResult);
       setWorkspaceState(nextState);
+      setActionProgress(nextActionProgress);
       setRevisionText('');
       setRevisionNote('已基于当前结果生成新版，并保存到本地工作台。');
     } catch (error) {
@@ -1574,6 +1680,28 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
     } finally {
       setIsRevising(false);
     }
+  };
+
+  const handleActionProgressUpdate = (actionId: string, status: ActionStatus) => {
+    const nextProgress = updateActionProgress(actionProgress, actionId, status);
+    const baseState = workspaceState ?? createSolutionWorkspaceState({
+      problemText,
+      materialSummary,
+      contractId: inferredContractId,
+      currentResult: workspaceResult,
+      actionProgress,
+    });
+    const nextState = updateSolutionWorkspaceActionProgress(baseState, nextProgress);
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(
+        SOLUTION_WORKSPACE_STORAGE_KEY,
+        serializeSolutionWorkspaceState(nextState)
+      );
+    }
+
+    setActionProgress(nextProgress);
+    setWorkspaceState(nextState);
   };
 
   return (
@@ -1626,6 +1754,8 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
           ))}
         </div>
       </section>
+
+      <ActionProgressCard progress={actionProgress} onUpdate={handleActionProgressUpdate} />
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">

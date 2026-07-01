@@ -1,4 +1,5 @@
 import type { SolutionResult } from '@/types/radar';
+import type { ActionProgressState } from './actionProgressEngine';
 
 export const SOLUTION_WORKSPACE_STORAGE_KEY = 'futurelens-solution-workspace-v1';
 
@@ -18,6 +19,7 @@ export type SolutionWorkspaceState = {
   materialSummary?: string;
   contractId?: string;
   currentResult: SolutionResult;
+  actionProgress?: ActionProgressState;
   revisions: SolutionRevisionRecord[];
   updatedAt: string;
 };
@@ -25,6 +27,7 @@ export type SolutionWorkspaceState = {
 export function createSolutionWorkspaceState(input: {
   problemText: string;
   currentResult: SolutionResult;
+  actionProgress?: ActionProgressState;
   contractId?: string;
   materialSummary?: string;
   now?: string;
@@ -37,6 +40,7 @@ export function createSolutionWorkspaceState(input: {
     materialSummary: input.materialSummary,
     contractId: input.contractId,
     currentResult: input.currentResult,
+    actionProgress: input.actionProgress,
     revisions: [],
     updatedAt,
   };
@@ -47,6 +51,7 @@ export function appendSolutionRevision(
   revision: Omit<SolutionRevisionRecord, 'id' | 'createdAt'> & {
     id?: string;
     createdAt?: string;
+    actionProgress?: ActionProgressState;
   }
 ): SolutionWorkspaceState {
   const createdAt = revision.createdAt ?? new Date().toISOString();
@@ -61,8 +66,21 @@ export function appendSolutionRevision(
   return {
     ...state,
     currentResult: revision.result,
+    actionProgress: revision.actionProgress ?? state.actionProgress,
     revisions: [...state.revisions, record],
     updatedAt: createdAt,
+  };
+}
+
+export function updateSolutionWorkspaceActionProgress(
+  state: SolutionWorkspaceState,
+  actionProgress: ActionProgressState,
+  now = new Date().toISOString()
+): SolutionWorkspaceState {
+  return {
+    ...state,
+    actionProgress,
+    updatedAt: now,
   };
 }
 
