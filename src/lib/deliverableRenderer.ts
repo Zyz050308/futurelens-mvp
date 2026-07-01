@@ -48,6 +48,270 @@ function genericChecklist(): string {
   ].join('\n');
 }
 
+function bulletList(items: string[], fallback: string): string {
+  const source = items.length > 0 ? items : [fallback];
+  return source.map(item => `- ${item}`).join('\n');
+}
+
+function evidenceList(frame: ProblemFrame): string {
+  const snippets = frame.inputAsset?.evidenceSnippets ?? [];
+  if (snippets.length === 0) return '- 暂不引用完整原文，只根据材料摘要生成诊断。';
+  return snippets.map(snippet => `- ${snippet.label}：${snippet.text}（${snippet.reason}）`).join('\n');
+}
+
+function renderInputAsset(frame: ProblemFrame): RenderedDeliverables {
+  const asset = frame.inputAsset;
+  if (!asset || asset.inputMode === 'problem_only') return renderByContract(frame, frame.contractId ?? 'generic_document');
+
+  const commonSections = [
+    {
+      heading: '材料类型判断',
+      content: [
+        `输入模式：${asset.inputMode}`,
+        `材料类型：${asset.assetType}`,
+        `识别摘要：${asset.assetSummary}`,
+        `置信度：${asset.confidence.toFixed(2)}`,
+      ].join('\n'),
+    },
+    {
+      heading: '原材料可用部分',
+      content: [
+        bulletList(asset.usableParts, '当前材料太短，暂时只能保留“已有一段材料”这个事实。'),
+        '',
+        '短证据片段：',
+        evidenceList(frame),
+      ].join('\n'),
+    },
+    {
+      heading: '主要问题',
+      content: bulletList(asset.mainProblems, '材料目的、结构和证据还不够清楚。'),
+    },
+    {
+      heading: '缺失信息',
+      content: bulletList(asset.missingParts, '需要补充材料用途、目标对象和完成标准。'),
+    },
+  ];
+
+  if (asset.assetType === 'resume_project') {
+    const star = [
+      '背景：在【项目 / 课程 / 实习】中，我面对【具体问题】。',
+      '任务：我负责【个人职责】，需要完成【交付物】。',
+      '行动：我通过【调研 / 设计 / 协作 / 工具】完成【关键动作】。',
+      '结果：最终产出【成果】，带来【反馈 / 数据 / 质量提升】。',
+      '能力证明：这段经历体现了我的【目标岗位相关能力】。',
+    ].join('\n');
+    const rewrite = '我在【校园文创项目】中负责【调研、海报设计和展示整理】，目标是把【文化主题】转化成可展示的视觉方案。我通过【用户/场景调研】提取设计方向，并完成【海报与展示物料】。建议继续补充老师反馈、展示效果或数量结果，让这段经历更像岗位能力证明。';
+
+    return {
+      usableOutput: {
+        title: '项目经历材料分析与改写第一版',
+        sections: normalizeSections([
+          ...commonSections,
+          { heading: '项目经历诊断', content: '这段材料已经有“做了什么”，但缺少“为什么做、你怎么做、结果如何”。如果用于投递，需要把任务列表改成能力证据。' },
+          { heading: 'STAR 改写版本', content: star },
+          { heading: '可替换项目描述', content: rewrite },
+          { heading: '量化结果补充问题', content: '- 项目周期是多久？\n- 最终产出了几张海报、几页方案或几个展示物？\n- 老师或用户的反馈是什么？\n- 你负责的是独立完成还是团队协作？\n- 这段经历最能证明哪项 UI / 视觉能力？' },
+          { heading: '投递前检查', content: '- [ ] 是否写清目标岗位。\n- [ ] 是否突出个人贡献。\n- [ ] 是否有结果或反馈。\n- [ ] 是否避免“负责相关工作”这种空话。\n- [ ] 是否能让招聘方快速看到能力。' },
+        ]),
+      },
+      copyableTemplates: [
+        { title: 'STAR 改写模板', content: star },
+        { title: '可替换项目描述', content: rewrite },
+        { title: '量化结果补充清单', content: '周期：\n规模：\n个人贡献：\n反馈：\n对应岗位能力：' },
+      ],
+      nextRefinementPrompt: '补充目标岗位、项目周期、最终成果数量和反馈，我可以继续把这段经历改成更像可投递版本。',
+    };
+  }
+
+  if (asset.assetType === 'report_draft') {
+    const structure = [
+      '1. 汇报主题：说明调研对象和核心问题。',
+      '2. 调研背景：说明为什么选这个主题。',
+      '3. 资料整理：把照片、网上资料、观察记录分开放。',
+      '4. 核心发现：提炼 2-3 个最重要的发现。',
+      '5. 个人判断：说明这些发现意味着什么。',
+      '6. 结论：回到作业或汇报目标。',
+    ].join('\n');
+    const pagePlan = table(
+      ['页码', '页面主题', '放什么', '检查点'],
+      [
+        ['1', '标题与主题', '调研题目、姓名、课程', '一眼知道讲什么'],
+        ['2', '调研对象', '城市/地点/文化元素/照片', '对象足够具体'],
+        ['3', '资料整理', '照片、资料来源、观察记录', '每个素材有说明'],
+        ['4', '核心发现', '2-3 个发现和证据', '不是只堆图片'],
+        ['5', '总结', '结论、启发、下一步', '能收束主题'],
+      ]
+    );
+
+    return {
+      usableOutput: {
+        title: '混乱汇报材料重组第一版',
+        sections: normalizeSections([
+          ...commonSections,
+          { heading: '结构诊断', content: '当前材料按“第一部分/第二部分/第三部分”堆放，但每部分和汇报目标的关系不够清楚。需要先按“主题-资料-发现-结论”重组。' },
+          { heading: '重组后的汇报结构', content: structure },
+          { heading: '每页放什么', content: pagePlan },
+          { heading: '开头介绍模板', content: '本次汇报围绕【调研主题】展开，主要想回答【核心问题】。我目前整理了【照片 / 资料 / 观察记录】，会从【对象介绍】、【资料证据】和【核心发现】三个部分说明，最后总结这次调研对【课程/作业目标】的启发。' },
+          { heading: '完成检查清单', content: '- [ ] 每一页是否有明确标题。\n- [ ] 每张照片是否有说明。\n- [ ] 网上资料是否标注来源。\n- [ ] 是否有 2-3 个自己的发现。\n- [ ] 结论是否回应调研目的。' },
+        ]),
+      },
+      copyableTemplates: [
+        { title: '重组后的汇报结构', content: structure },
+        { title: '每页内容安排表', content: pagePlan },
+        { title: '开头介绍模板', content: '本次汇报围绕【调研主题】展开，主要想回答【核心问题】。\n我目前整理了【已有资料】，会从【维度一】、【维度二】和【维度三】说明。\n最后会总结这次调研对【课程主题】的启发。' },
+      ],
+      nextRefinementPrompt: '补充汇报主题、页数要求和已有照片/资料数量，我可以继续改成完整 PPT 大纲。',
+    };
+  }
+
+  if (asset.assetType === 'assignment_requirement') {
+    const taskPlan = table(
+      ['任务', '要做什么', '输出物', '检查点'],
+      [
+        ['理解要求', '圈出主题、必须包含内容、截止时间', '要求清单', '没有漏项'],
+        ['收集资料', '找来源、样子、寓意、现场观察', '资料包', '每条资料有来源'],
+        ['组织汇报', '按来源-样子-寓意-观察排序', 'PPT 结构', '顺序清楚'],
+        ['提交检查', '核对页数、命名、格式、截止时间', '最终版本', '符合要求'],
+      ]
+    );
+
+    return {
+      usableOutput: {
+        title: '作业要求拆解第一版',
+        sections: normalizeSections([
+          ...commonSections,
+          { heading: '任务拆解', content: taskPlan },
+          { heading: '资料清单', content: '- 来源：纹样来自哪里。\n- 样子：纹样长什么样，可以放图片。\n- 寓意：它通常象征什么。\n- 现场观察：在哪里看到、有什么细节。\n- 资料来源：网页、书籍、照片或观察记录。' },
+          { heading: '时间安排', content: '第 1 天：确定纹样对象并收集资料。\n第 2 天：整理 PPT 结构和图片说明。\n第 3 天：补充结论、检查格式并提交。' },
+          { heading: '提交检查', content: '- [ ] 是否包括来源。\n- [ ] 是否包括样子。\n- [ ] 是否包括寓意。\n- [ ] 是否包括现场观察。\n- [ ] 是否按截止时间完成。' },
+        ]),
+      },
+      copyableTemplates: [
+        { title: '作业任务拆解表', content: taskPlan },
+        { title: '资料收集清单', content: '来源：\n样子：\n寓意：\n现场观察：\n资料来源：' },
+      ],
+      nextRefinementPrompt: '补充课程主题、PPT 页数和提交格式，我可以继续生成完整页码安排。',
+    };
+  }
+
+  if (asset.assetType === 'business_idea') {
+    const mvp = table(
+      ['模块', '第一版做什么', '暂时不做什么', '验证指标'],
+      [
+        ['上传作业要求', '支持粘贴文本', '不做 PDF/DOCX', '是否愿意粘贴真实要求'],
+        ['整理草稿', '输出结构和问题点', '不做自动提交', '整理结果是否可用'],
+        ['改写建议', '给出可替换片段', '不做复杂评分', '用户是否继续修改'],
+      ]
+    );
+
+    return {
+      usableOutput: {
+        title: '产品想法验证计划第一版',
+        sections: normalizeSections([
+          ...commonSections,
+          { heading: '核心假设', content: '- 大学生确实会卡在“作业要求和草稿整理”这一步。\n- 他们愿意把作业要求和草稿粘贴给工具。\n- 结构整理和改写建议比泛泛建议更有价值。' },
+          { heading: '目标用户', content: '优先找 5-8 位近期有课程作业、论文、汇报或设计作业的大学生，不要一开始覆盖所有学生。' },
+          { heading: '访谈问题', content: '1. 最近一次作业卡在哪里？\n2. 你会不会把作业要求发给 AI？为什么？\n3. 你最想让 AI 帮你整理什么？\n4. 如果只能给一个功能，你会选结构整理、改写还是检查清单？\n5. 什么结果会让你愿意下次继续用？' },
+          { heading: 'MVP 范围', content: mvp },
+          { heading: '验证指标', content: '- 至少 5 人愿意提供真实作业要求。\n- 至少 3 人认为整理结果能直接帮他开始。\n- 至少 2 人愿意在下一次作业继续用。\n- 用户能说清楚最有价值的一个输出。' },
+          { heading: '两周计划', content: '第 1-2 天：写清目标用户和访谈问题。\n第 3-6 天：访谈 5 位学生。\n第 7-9 天：用手工方式模拟输出。\n第 10-14 天：判断 MVP 只保留哪些功能。' },
+        ]),
+      },
+      copyableTemplates: [
+        { title: '用户访谈问题', content: '最近一次作业卡在哪里？\n你会不会把作业要求发给 AI？为什么？\n你最想让 AI 帮你整理什么？\n什么结果会让你愿意继续用？' },
+        { title: 'MVP 范围表', content: mvp },
+        { title: '两周验证计划', content: '第 1-2 天：确定目标用户。\n第 3-6 天：完成访谈。\n第 7-9 天：手工模拟结果。\n第 10-14 天：收敛 MVP 范围。' },
+      ],
+      nextRefinementPrompt: '补充目标用户是谁、他们现在怎么完成作业，我可以继续把访谈和 MVP 做得更具体。',
+    };
+  }
+
+  if (asset.assetType === 'table_like_text') {
+    const fields = table(
+      ['字段名', '用途', '示例值', '规则', '检查点'],
+      [
+        ['产品名称', '识别分析对象', '产品A', '每个产品一行', '名称不要混用'],
+        ['销量', '判断卖得好不好', '120', '统一统计周期', '单位一致'],
+        ['排名', '看 Top 产品', '第 1 名', '按销量降序', '说明排序口径'],
+        ['占比', '看贡献度', '52%', '单品销量 / 总销量', '总和应接近 100%'],
+      ]
+    );
+    const ranking = table(
+      ['排名', '产品', '销量', '初步判断', '下一步'],
+      [
+        ['1', '产品A', '120', '当前销量最高', '分析为什么卖得好'],
+        ['2', '产品B', '80', '中等表现', '看是否有增长空间'],
+        ['3', '产品C', '30', '销量较低', '判断是否调整或停推'],
+      ]
+    );
+
+    return {
+      usableOutput: {
+        title: '销售数据文字分析第一版',
+        sections: normalizeSections([
+          ...commonSections,
+          { heading: '数据字段表', content: fields },
+          { heading: '排名表', content: ranking },
+          { heading: '初步结论', content: '从当前数字看，产品A卖得最好，产品B次之，产品C最低。下一步不要只看销量，还要补充价格、毛利、时间周期和库存，才能判断该重点推哪个。' },
+          { heading: '下一步动作', content: '- 补充每个产品单价。\n- 补充统计周期。\n- 计算销售额和占比。\n- 看产品A是否毛利也最高。\n- 判断产品C是低潜力还是缺少曝光。' },
+        ]),
+      },
+      copyableTemplates: [
+        { title: '数据字段表', content: fields },
+        { title: '排名表', content: ranking },
+        { title: '下一步动作清单', content: '补充单价：\n补充周期：\n计算销售额：\n计算占比：\n判断主推产品：' },
+      ],
+      nextRefinementPrompt: '补充每个产品的单价、成本和统计周期，我可以继续生成销售额和毛利判断。',
+    };
+  }
+
+  if (asset.assetType === 'copywriting_draft') {
+    const rewrite = '我们为【目标人群】提供【核心产品/服务】。\n它重点解决【具体问题】，让用户在【使用场景】中获得【核心价值】。\n相比普通选择，我们更强调【核心卖点一】和【核心卖点二】。';
+    const formal = '【品牌名】面向【目标人群】，提供兼具【功能价值】与【体验价值】的产品方案。\n品牌希望通过【核心能力】帮助用户在【具体场景】中更高效地完成【目标】。\n这套表达更适合官网、介绍页或正式材料。';
+    const concise = '为【目标人群】提供【核心价值】的【产品/品牌】。\n适合【使用场景】，解决【具体问题】。\n一句话记忆点：【最想让用户记住的话】。';
+
+    return {
+      usableOutput: {
+        title: '品牌文案诊断与改写第一版',
+        sections: normalizeSections([
+          ...commonSections,
+          { heading: '文案问题诊断', content: '原文里“很好”“高级”“适合年轻人”都偏抽象，缺少目标人群、具体场景和可感知卖点。' },
+          { heading: '改写版本', content: rewrite },
+          { heading: '更正式版本', content: formal },
+          { heading: '更简洁版本', content: concise },
+          { heading: '修改说明', content: '- 把“很好”改成具体价值。\n- 把“高级”改成可感知体验。\n- 把“年轻人”细化成具体目标人群。\n- 增加使用场景，让文案不空。' },
+        ]),
+      },
+      copyableTemplates: [
+        { title: '通用改写版本', content: rewrite },
+        { title: '更正式版本', content: formal },
+        { title: '更简洁版本', content: concise },
+      ],
+      nextRefinementPrompt: '补充品牌名、目标人群、产品特点和使用场景，我可以继续改成更贴近真实品牌的一版。',
+    };
+  }
+
+  const neutral = '这份材料想说明的是【核心信息】。\n接收方最需要理解的是【关键结论】。\n目前最需要补充的是【证据 / 数据 / 示例】。\n建议结构：\n1. 先说明目的\n2. 再说明关键信息\n3. 再用证据支撑\n4. 最后给出结论或下一步动作';
+
+  return {
+    usableOutput: {
+      title: '通用材料诊断与改写第一版',
+      sections: normalizeSections([
+        ...commonSections,
+        { heading: '材料问题诊断', content: '当前材料可以先作为原始线索，但用途、接收对象、核心结论和证据都还需要补清楚。' },
+        { heading: '结构整理', content: '1. 材料目的\n2. 接收方最关心的信息\n3. 已有证据或例子\n4. 缺失信息\n5. 结论或下一步动作' },
+        { heading: '可复制改写版本', content: neutral },
+        { heading: '下一步补充问题', content: '- 这份材料给谁看？\n- 你希望对方看完做什么？\n- 材料里最重要的一段是什么？\n- 有没有数据、例子或结果可以补充？' },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '通用材料改写模板', content: neutral },
+      { title: '材料检查清单', content: '- [ ] 是否写清材料目的。\n- [ ] 是否写清接收对象。\n- [ ] 是否有核心结论。\n- [ ] 是否有证据、数据或示例。\n- [ ] 是否有下一步动作。' },
+    ],
+    nextRefinementPrompt: '补充这份材料给谁看、想达到什么效果、已有哪几段内容，我可以继续改写成更完整的一版。',
+  };
+}
+
 function renderMessageDraft(): RenderedDeliverables {
   const message = [
     '老师您好，我想确认一下这次作业的提交时间。',
@@ -528,5 +792,9 @@ function renderByContract(frame: ProblemFrame, contractId: OutputContractId): Re
 }
 
 export function renderDeliverables(frame: ProblemFrame, contract: OutputContract): RenderedDeliverables {
+  if (frame.inputAsset && frame.inputAsset.inputMode !== 'problem_only') {
+    return renderInputAsset(frame);
+  }
+
   return renderByContract(frame, contract.contractId);
 }

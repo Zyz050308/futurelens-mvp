@@ -14,6 +14,7 @@ import {
 } from '@/lib/careerAction';
 import { ensureSolutionPack } from '@/lib/solutionPack';
 import { buildSolutionResult } from '@/lib/solutionEngine';
+import { analyzeInputAsset } from '@/lib/inputAssetAnalyzer';
 
 export interface GenerateRadarRequest {
   profile: FutureProfile;
@@ -35,6 +36,25 @@ function normalizeAttachedContext(attachedContext?: GenerateRadarRequest['attach
     label: attachedContext.label?.trim() || '粘贴材料',
     content: content.slice(0, 5000),
   };
+}
+
+function buildInputAssetSupportText(profile: FutureProfile): string {
+  const extended = profile as FutureProfile & {
+    extraContext?: string;
+    materialsNote?: string;
+  };
+
+  return [
+    profile.currentGoal,
+    profile.desiredOutcome,
+    profile.currentSkills,
+    profile.currentAnxiety,
+    profile.weeklyTime,
+    profile.riskPreference,
+    profile.majorOrCareer,
+    extended.extraContext,
+    extended.materialsNote,
+  ].map(value => value?.trim()).filter(Boolean).join(' ');
 }
 
 function buildPrompt(
@@ -1057,6 +1077,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedAttachedContext = normalizeAttachedContext(body.attachedContext);
+    const inputAssetFrame = analyzeInputAsset({
+      rawProblem: profile.currentSituation || '',
+      supportText: buildInputAssetSupportText(profile),
+      attachedText: normalizedAttachedContext?.content,
+    });
+
     // 构建 Prompt
     console.log('[DEBUG] 开始构建 Prompt');
     const prompt = buildPrompt(profile, changeSignals, body.userStateProfile, body.attachedContext);
@@ -1117,11 +1144,15 @@ export async function POST(request: NextRequest) {
       alignedRadarData,
       profile,
       body.userStateProfile,
-      { attachedContext: normalizeAttachedContext(body.attachedContext) }
+      { attachedContext: normalizedAttachedContext }
     );
     const radarData = {
       ...radarDataWithSolutionPack,
-      solutionResult: radarDataWithSolutionPack.solutionResult || buildSolutionResult(profile, radarDataWithSolutionPack),
+      solutionResult: radarDataWithSolutionPack.solutionResult || buildSolutionResult(
+        profile,
+        radarDataWithSolutionPack,
+        { inputAssetFrame }
+      ),
     };
 
     // 检查是否是 fallback（解析失败）
@@ -1138,18 +1169,30 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[API/Radar/Generate] 生成失败:', error);
 
+    const normalizedFallbackAttachedContext = normalizeAttachedContext(requestBody?.attachedContext);
+    const fallbackInputAssetFrame = requestBody?.profile
+      ? analyzeInputAsset({
+          rawProblem: requestBody.profile.currentSituation || '',
+          supportText: buildInputAssetSupportText(requestBody.profile),
+          attachedText: normalizedFallbackAttachedContext?.content,
+        })
+      : undefined;
     const fallbackRadarWithSolutionPack = requestBody?.profile
       ? ensureSolutionPack(
           createFallbackRadar(),
           requestBody.profile,
           requestBody.userStateProfile,
-          { attachedContext: normalizeAttachedContext(requestBody.attachedContext) }
+          { attachedContext: normalizedFallbackAttachedContext }
         )
       : createFallbackRadar();
     const fallbackRadar = requestBody?.profile
       ? {
           ...fallbackRadarWithSolutionPack,
-          solutionResult: fallbackRadarWithSolutionPack.solutionResult || buildSolutionResult(requestBody.profile, fallbackRadarWithSolutionPack),
+          solutionResult: fallbackRadarWithSolutionPack.solutionResult || buildSolutionResult(
+            requestBody.profile,
+            fallbackRadarWithSolutionPack,
+            { inputAssetFrame: fallbackInputAssetFrame }
+          ),
         }
       : fallbackRadarWithSolutionPack;
 

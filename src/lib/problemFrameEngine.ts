@@ -1,4 +1,5 @@
 import type { FutureProfile } from '@/types/radar';
+import type { InputAssetFrame, InputMode } from './inputAssetAnalyzer';
 
 export type UserAction =
   | 'create'
@@ -54,6 +55,8 @@ export type OutputContractId =
 export type ProblemFrame = {
   rawProblem: string;
   supportText: string;
+  inputMode?: InputMode;
+  inputAsset?: InputAssetFrame;
   userNeed: string;
   centerOutput: {
     name: string;
@@ -84,6 +87,10 @@ export type ProblemFrame = {
   successCriteria: string[];
   missingInfo: string[];
   confidence: number;
+};
+
+type BuildProblemFrameOptions = {
+  inputAssetFrame?: InputAssetFrame;
 };
 
 function compactText(values: Array<string | undefined>): string {
@@ -205,6 +212,36 @@ function inferContractId(rawProblem: string, supportText: string): OutputContrac
   return 'generic_document';
 }
 
+function inferPrimaryContractId(rawProblem: string): OutputContractId | undefined {
+  if (
+    includesAny(rawProblem, ['发消息', '一条消息', '怎么说', '礼貌', '询问', '问一下']) &&
+    !includesAny(rawProblem, ['评分标准', '作业说明', '汇报结构'])
+  ) {
+    return 'message_draft';
+  }
+
+  return undefined;
+}
+
+function selectContractId(
+  rawProblem: string,
+  supportText: string,
+  inputAssetFrame?: InputAssetFrame
+): OutputContractId {
+  const primaryContractId = inferPrimaryContractId(rawProblem);
+  if (primaryContractId) return primaryContractId;
+
+  if (
+    inputAssetFrame &&
+    inputAssetFrame.inputMode !== 'problem_only' &&
+    inputAssetFrame.suggestedContractId
+  ) {
+    return inputAssetFrame.suggestedContractId;
+  }
+
+  return inferContractId(rawProblem, supportText);
+}
+
 function archetypeFromContract(contractId: OutputContractId): ProblemArchetype {
   if (contractId === 'rubric_assignment' || contractId === 'rubric_self_assessment') return 'rubric';
   if (contractId === 'project_retrospective' || contractId === 'message_draft' || contractId === 'generic_document') return 'generic';
@@ -321,6 +358,24 @@ function inferInputAssets(rawProblem: string, supportText: string): ProblemFrame
   return assets.length > 0 ? assets : [{ type: 'none', state: 'missing', description: '用户尚未提供明确材料，只描述了想推进的问题。' }];
 }
 
+function inputAssetsFromAssetFrame(inputAssetFrame?: InputAssetFrame): ProblemFrame['inputAssets'] | undefined {
+  if (!inputAssetFrame || inputAssetFrame.inputMode === 'problem_only') return undefined;
+
+  if (inputAssetFrame.assetType === 'table_like_text') {
+    return [{
+      type: 'data',
+      state: 'provided',
+      description: inputAssetFrame.assetSummary,
+    }];
+  }
+
+  return [{
+    type: 'draft',
+    state: 'provided',
+    description: inputAssetFrame.assetSummary,
+  }];
+}
+
 function inferTransformation(rawProblem: string, contractId: OutputContractId): string[] {
   const map: Record<OutputContractId, string[]> = {
     message_draft: ['明确消息目的', '组织语气', '生成可发送版本', '生成更礼貌版本'],
@@ -374,25 +429,36 @@ function inferMissingInfo(contractId: OutputContractId): string[] {
   return map[contractId];
 }
 
-export function buildProblemFrame(profile: FutureProfile): ProblemFrame {
+export function buildProblemFrame(
+  profile: FutureProfile,
+  options: BuildProblemFrameOptions = {}
+): ProblemFrame {
   const rawProblem = getRawProblem(profile);
   const supportText = getSupportText(profile);
-  const contractId = inferContractId(rawProblem, supportText);
+  const contractId = selectContractId(rawProblem, supportText, options.inputAssetFrame);
   const archetype = archetypeFromContract(contractId);
   const centerOutput = {
     name: centerOutputName(contractId, rawProblem),
     outputType: outputTypeFromContract(contractId, rawProblem),
   };
   const action = inferAction(rawProblem);
-  const transformationNeeded = inferTransformation(rawProblem, contractId);
-  const inputAssets = inferInputAssets(rawProblem, supportText);
-  const missingInfo = inferMissingInfo(contractId);
+  const transformationNeeded = Array.from(new Set([
+    ...inferTransformation(rawProblem, contractId),
+    ...(options.inputAssetFrame?.rewriteTargets ?? []),
+  ]));
+  const inputAssets = inputAssetsFromAssetFrame(options.inputAssetFrame) ?? inferInputAssets(rawProblem, supportText);
+  const missingInfo = Array.from(new Set([
+    ...inferMissingInfo(contractId),
+    ...(options.inputAssetFrame?.missingParts ?? []),
+  ])).slice(0, 8);
   const object = inferObject(rawProblem, contractId);
   const audience = inferAudience(rawProblem, supportText);
 
   return {
     rawProblem,
     supportText,
+    inputMode: options.inputAssetFrame?.inputMode,
+    inputAsset: options.inputAssetFrame,
     userNeed: `用户想把当前问题推进成：${centerOutput.name}`,
     centerOutput,
     archetype,
@@ -419,6 +485,8 @@ export function buildProblemFrame(profile: FutureProfile): ProblemFrame {
       '有可复制内容，能直接拿走使用',
     ],
     missingInfo,
-    confidence: rawProblem === '用户还没有说清楚当前问题。' ? 0.35 : 0.82,
+    confidence: options.inputAssetFrame?.inputMode && options.inputAssetFrame.inputMode !== 'problem_only'
+      ? Math.max(0.5, options.inputAssetFrame.confidence)
+      : rawProblem === '用户还没有说清楚当前问题。' ? 0.35 : 0.82,
   };
 }

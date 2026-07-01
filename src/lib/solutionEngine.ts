@@ -8,6 +8,11 @@ import { buildOutputContract, type OutputContract } from './outputContract';
 import { buildProblemFrame, type OutputType, type ProblemFrame } from './problemFrameEngine';
 import { renderDeliverables } from './deliverableRenderer';
 import { runExecutorRuntime } from './executorRuntime';
+import { analyzeInputAsset, type InputAssetFrame } from './inputAssetAnalyzer';
+
+type BuildSolutionResultOptions = {
+  inputAssetFrame?: InputAssetFrame;
+};
 
 function compactText(values: Array<string | undefined>): string {
   return values.filter(Boolean).join(' ').trim();
@@ -787,6 +792,25 @@ function getSkillNameFromOutputType(outputType: OutputType): SolutionSkillName {
   return '\u901a\u7528\u89e3\u51b3 Skill' as SolutionSkillName;
 }
 
+function getSupportTextForInputAsset(profile: FutureProfile): string {
+  const extended = profile as FutureProfile & {
+    extraContext?: string;
+    materialsNote?: string;
+  };
+
+  return compactText([
+    profile.currentGoal,
+    profile.desiredOutcome,
+    profile.currentSkills,
+    profile.currentAnxiety,
+    profile.weeklyTime,
+    profile.riskPreference,
+    profile.majorOrCareer,
+    extended.extraContext,
+    extended.materialsNote,
+  ]);
+}
+
 function formatDeliverableContent(deliverable: OutputContract['deliverables'][number]): string {
   const rules = deliverable.contentRules.map(item => `- ${item}`).join('\n');
   const sections = deliverable.suggestedSections.map(item => `- ${item}：`).join('\n');
@@ -885,9 +909,14 @@ function buildOutputForIntent(
 
 export function buildSolutionResult(
   profile: FutureProfile,
-  _radar?: Partial<OpportunityRadarV4>
+  _radar?: Partial<OpportunityRadarV4>,
+  options: BuildSolutionResultOptions = {}
 ): SolutionResult {
-  const problemFrame = buildProblemFrame(profile);
+  const inputAssetFrame = options.inputAssetFrame ?? analyzeInputAsset({
+    rawProblem: profile.currentSituation || '',
+    supportText: getSupportTextForInputAsset(profile),
+  });
+  const problemFrame = buildProblemFrame(profile, { inputAssetFrame });
   const outputContract = buildOutputContract(problemFrame);
 
   if (outputContract.deliverables.length > 0) {
