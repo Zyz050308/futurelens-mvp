@@ -28,6 +28,10 @@ import {
   type ActionProgressState,
   type ActionStatus,
 } from '@/lib/actionProgressEngine';
+import {
+  evaluateOutcomeState,
+  type OutcomeState,
+} from '@/lib/outcomeStateEngine';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
 import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
@@ -1546,6 +1550,75 @@ function ActionProgressCard({
   );
 }
 
+function OutcomeStateCard({
+  outcome,
+  onInstruction,
+}: {
+  outcome: OutcomeState;
+  onInstruction: (instruction: string) => void;
+}) {
+  const stageLabels: Record<OutcomeState['stage'], string> = {
+    not_started: '还没开始',
+    in_progress: '推进中',
+    blocked: '遇到阻塞',
+    ready_to_finalize: '接近完成',
+    done: '已完成',
+  };
+  const primaryLabel: Record<OutcomeState['stage'], string> = {
+    not_started: '继续执行',
+    in_progress: '继续执行',
+    blocked: '补齐缺失',
+    ready_to_finalize: '生成最终版',
+    done: '生成最终版',
+  };
+  const progressPercent = Math.round(outcome.completionRate * 100);
+
+  return (
+    <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+            当前推进状态
+          </div>
+          <h2 className="text-lg font-semibold text-[#111827]">{stageLabels[outcome.stage]}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-[#64748B]">{outcome.nextBestMove}</p>
+        </div>
+        <div className="rounded-2xl bg-[#EEF5FF] px-4 py-3 text-center">
+          <div className="text-2xl font-semibold text-[#2463EB]">{progressPercent}%</div>
+          <div className="text-xs font-medium text-[#64748B]">完成度</div>
+        </div>
+      </div>
+      {outcome.blockers.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-[#FFF7ED] p-4">
+          <div className="text-xs font-semibold text-[#C2410C]">需要补齐</div>
+          <ul className="mt-2 space-y-1 text-xs leading-relaxed text-[#7C2D12]">
+            {outcome.blockers.slice(0, 3).map(blocker => (
+              <li key={blocker}>• {blocker}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onInstruction(outcome.suggestedInstruction)}
+          className="rounded-full bg-[#111827] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-black"
+        >
+          {primaryLabel[outcome.stage]}
+        </button>
+        <button
+          type="button"
+          onClick={() => onInstruction('重新拆解执行清单')}
+          className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#64748B] ring-1 ring-[#D6E6FF] transition-colors hover:bg-[#F8FAFD]"
+        >
+          重新拆解执行清单
+        </button>
+      </div>
+      <div className="mt-3 text-xs text-[#9CA3AF]">判断置信度：{Math.round(outcome.confidence * 100)}%</div>
+    </section>
+  );
+}
+
 function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result: SolutionResult; profile: FutureProfile; capabilityPlan: CapabilityPlan }) {
   const extendedProfile = profile as FutureProfile & {
     currentSituation?: string;
@@ -1574,6 +1647,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
   const [revisionError, setRevisionError] = useState<string | null>(null);
   const [isRevising, setIsRevising] = useState(false);
   const [actionProgress, setActionProgress] = useState<ActionProgressState>(() => buildActionProgress(result, inferredContractId));
+  const [outcomeState, setOutcomeState] = useState<OutcomeState>(() => evaluateOutcomeState(buildActionProgress(result, inferredContractId)));
   const suggestions = getRevisionSuggestions(inferredContractId, workspaceResult);
 
   useEffect(() => {
@@ -1589,10 +1663,11 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
       && (!inferredContractId || !saved.contractId || saved.contractId === inferredContractId)
     ) {
       const restoredProgress = saved.actionProgress ?? buildActionProgress(saved.currentResult, saved.contractId ?? inferredContractId);
+      const restoredOutcome = saved.outcomeState ?? evaluateOutcomeState(restoredProgress);
       const normalizedSaved = saved.actionProgress
-        ? saved
-        : updateSolutionWorkspaceActionProgress(saved, restoredProgress);
-      if (!saved.actionProgress) {
+        ? { ...saved, outcomeState: restoredOutcome }
+        : updateSolutionWorkspaceActionProgress(saved, restoredProgress, restoredOutcome);
+      if (!saved.actionProgress || !saved.outcomeState) {
         window.localStorage.setItem(
           SOLUTION_WORKSPACE_STORAGE_KEY,
           serializeSolutionWorkspaceState(normalizedSaved)
@@ -1601,16 +1676,19 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
       setWorkspaceState(normalizedSaved);
       setWorkspaceResult(normalizedSaved.currentResult);
       setActionProgress(restoredProgress);
+      setOutcomeState(restoredOutcome);
       return;
     }
 
     const initialActionProgress = buildActionProgress(result, inferredContractId);
+    const initialOutcomeState = evaluateOutcomeState(initialActionProgress);
     const nextState = createSolutionWorkspaceState({
       problemText,
       materialSummary,
       contractId: inferredContractId,
       currentResult: result,
       actionProgress: initialActionProgress,
+      outcomeState: initialOutcomeState,
     });
     window.localStorage.setItem(
       SOLUTION_WORKSPACE_STORAGE_KEY,
@@ -1619,6 +1697,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
     setWorkspaceState(nextState);
     setWorkspaceResult(result);
     setActionProgress(initialActionProgress);
+    setOutcomeState(initialOutcomeState);
   }, [baseResultKey, problemText, materialSummary, inferredContractId, result]);
 
   const submitRevision = async (rawInstruction: string, rawMode?: SolutionRevisionMode) => {
@@ -1649,18 +1728,21 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
 
       const nextResult = data.result as SolutionResult;
       const nextActionProgress = buildActionProgress(nextResult, workspaceState?.contractId ?? inferredContractId);
+      const nextOutcomeState = evaluateOutcomeState(nextActionProgress);
       const baseState = workspaceState ?? createSolutionWorkspaceState({
         problemText,
         materialSummary,
         contractId: inferredContractId,
         currentResult: workspaceResult,
         actionProgress,
+        outcomeState,
       });
       const nextState = appendSolutionRevision(baseState, {
         instruction,
         mode,
         result: nextResult,
         actionProgress: nextActionProgress,
+        outcomeState: nextOutcomeState,
       });
 
       if (typeof window !== 'undefined') {
@@ -1673,6 +1755,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
       setWorkspaceResult(nextResult);
       setWorkspaceState(nextState);
       setActionProgress(nextActionProgress);
+      setOutcomeState(nextOutcomeState);
       setRevisionText('');
       setRevisionNote('已基于当前结果生成新版，并保存到本地工作台。');
     } catch (error) {
@@ -1684,14 +1767,16 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
 
   const handleActionProgressUpdate = (actionId: string, status: ActionStatus) => {
     const nextProgress = updateActionProgress(actionProgress, actionId, status);
+    const nextOutcome = evaluateOutcomeState(nextProgress);
     const baseState = workspaceState ?? createSolutionWorkspaceState({
       problemText,
       materialSummary,
       contractId: inferredContractId,
       currentResult: workspaceResult,
       actionProgress,
+      outcomeState,
     });
-    const nextState = updateSolutionWorkspaceActionProgress(baseState, nextProgress);
+    const nextState = updateSolutionWorkspaceActionProgress(baseState, nextProgress, nextOutcome);
 
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(
@@ -1701,6 +1786,7 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
     }
 
     setActionProgress(nextProgress);
+    setOutcomeState(nextOutcome);
     setWorkspaceState(nextState);
   };
 
@@ -1754,6 +1840,8 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
           ))}
         </div>
       </section>
+
+      <OutcomeStateCard outcome={outcomeState} onInstruction={(instruction) => submitRevision(instruction, inferRevisionMode(instruction))} />
 
       <ActionProgressCard progress={actionProgress} onUpdate={handleActionProgressUpdate} />
 

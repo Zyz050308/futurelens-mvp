@@ -1,5 +1,6 @@
 import type { SolutionResult } from '@/types/radar';
 import type { ActionProgressState } from './actionProgressEngine';
+import type { OutcomeState } from './outcomeStateEngine';
 
 export const SOLUTION_WORKSPACE_STORAGE_KEY = 'futurelens-solution-workspace-v1';
 
@@ -20,6 +21,7 @@ export type SolutionWorkspaceState = {
   contractId?: string;
   currentResult: SolutionResult;
   actionProgress?: ActionProgressState;
+  outcomeState?: OutcomeState;
   revisions: SolutionRevisionRecord[];
   updatedAt: string;
 };
@@ -28,6 +30,7 @@ export function createSolutionWorkspaceState(input: {
   problemText: string;
   currentResult: SolutionResult;
   actionProgress?: ActionProgressState;
+  outcomeState?: OutcomeState;
   contractId?: string;
   materialSummary?: string;
   now?: string;
@@ -41,6 +44,7 @@ export function createSolutionWorkspaceState(input: {
     contractId: input.contractId,
     currentResult: input.currentResult,
     actionProgress: input.actionProgress,
+    outcomeState: input.outcomeState,
     revisions: [],
     updatedAt,
   };
@@ -52,6 +56,7 @@ export function appendSolutionRevision(
     id?: string;
     createdAt?: string;
     actionProgress?: ActionProgressState;
+    outcomeState?: OutcomeState;
   }
 ): SolutionWorkspaceState {
   const createdAt = revision.createdAt ?? new Date().toISOString();
@@ -67,6 +72,7 @@ export function appendSolutionRevision(
     ...state,
     currentResult: revision.result,
     actionProgress: revision.actionProgress ?? state.actionProgress,
+    outcomeState: revision.outcomeState ?? state.outcomeState,
     revisions: [...state.revisions, record],
     updatedAt: createdAt,
   };
@@ -75,11 +81,13 @@ export function appendSolutionRevision(
 export function updateSolutionWorkspaceActionProgress(
   state: SolutionWorkspaceState,
   actionProgress: ActionProgressState,
+  outcomeState?: OutcomeState,
   now = new Date().toISOString()
 ): SolutionWorkspaceState {
   return {
     ...state,
     actionProgress,
+    outcomeState: outcomeState ?? state.outcomeState,
     updatedAt: now,
   };
 }
