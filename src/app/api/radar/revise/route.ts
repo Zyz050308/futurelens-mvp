@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { reviseSolutionResult } from '@/lib/solutionRevisionEngine';
+import { reviseSolutionResultSmart } from '@/lib/llmRevisionEngine';
 import type { SolutionRevisionMode } from '@/lib/solutionWorkspace';
 import type { SolutionResult } from '@/types/radar';
 
@@ -42,14 +42,18 @@ export async function POST(request: NextRequest) {
     }
 
     const mode = body.mode && allowedModes.has(body.mode) ? body.mode : undefined;
-    const result = reviseSolutionResult({
+    const revision = await reviseSolutionResultSmart({
       previousResult: body.previousResult,
       instruction,
       mode,
       contractId: body.contractId,
     });
 
-    return NextResponse.json({ result });
+    return NextResponse.json({
+      result: revision.result,
+      source: revision.source,
+      fallbackError: revision.error,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to revise solution result.';
     const status = message.includes('required') ? 400 : 500;
