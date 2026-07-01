@@ -8,6 +8,19 @@ import { getChangeSignalsForProfile, generateProfileHash } from '@/lib/changeEng
 import { analyzeUserState } from '@/lib/stateEngine';
 import { routeCapabilities, type CapabilityPlan } from '@/lib/capabilityRouter';
 import { buildRefinedSolutionResult, buildSolutionResult } from '@/lib/solutionEngine';
+import {
+  SOLUTION_WORKSPACE_STORAGE_KEY,
+  appendSolutionRevision,
+  createSolutionWorkspaceState,
+  getRevisionSuggestions,
+  inferContractIdFromResult,
+  inferRevisionMode,
+  parseSolutionWorkspaceState,
+  serializeSolutionWorkspaceState,
+  summarizeWorkspaceText,
+  type SolutionRevisionMode,
+  type SolutionWorkspaceState,
+} from '@/lib/solutionWorkspace';
 import type { CreateDiscoveryInput, DiscoveryRecord } from '@/types/discovery';
 import type { FutureProfile, ChangeSignal, OpportunityRadarV4, TodayChange, ImpactOnUser, ActionItem, UserStateProfile, PersonalImpact, DecisionExplanation, ValueMigration, CoreInsight, SolutionPack, SolutionResult, ProblemShape, CapabilityName, SolutionMaterialType } from '@/types/radar';
 import FutureSelfAvatar from '@/components/FutureSelfAvatar';
@@ -1446,6 +1459,251 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
 // V6.5 二级折叠区域：系统分析依据
 // ============================================================
 
+function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result: SolutionResult; profile: FutureProfile; capabilityPlan: CapabilityPlan }) {
+  const extendedProfile = profile as FutureProfile & {
+    currentSituation?: string;
+    materialsNote?: string;
+  };
+  const rawProblemText = extendedProfile.currentSituation?.trim()
+    || profile.currentGoal?.trim()
+    || result.problemCore.summary;
+  const problemText = summarizeWorkspaceText(rawProblemText, '问题');
+  const materialSummary = extendedProfile.materialsNote
+    ? summarizeWorkspaceText(extendedProfile.materialsNote, '材料')
+    : undefined;
+  const inferredContractId = inferContractIdFromResult(result);
+  const baseResultKey = [
+    problemText,
+    inferredContractId,
+    result.usableOutput.title,
+    result.usableOutput.sections.length,
+    result.copyableTemplates.length,
+  ].join('|');
+
+  const [workspaceResult, setWorkspaceResult] = useState<SolutionResult>(result);
+  const [workspaceState, setWorkspaceState] = useState<SolutionWorkspaceState | null>(null);
+  const [revisionText, setRevisionText] = useState('');
+  const [revisionNote, setRevisionNote] = useState<string | null>(null);
+  const [revisionError, setRevisionError] = useState<string | null>(null);
+  const [isRevising, setIsRevising] = useState(false);
+  const suggestions = getRevisionSuggestions(inferredContractId, workspaceResult);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const saved = parseSolutionWorkspaceState(
+      window.localStorage.getItem(SOLUTION_WORKSPACE_STORAGE_KEY)
+    );
+
+    if (
+      saved
+      && saved.problemText === problemText
+      && (!inferredContractId || !saved.contractId || saved.contractId === inferredContractId)
+    ) {
+      setWorkspaceState(saved);
+      setWorkspaceResult(saved.currentResult);
+      return;
+    }
+
+    const nextState = createSolutionWorkspaceState({
+      problemText,
+      materialSummary,
+      contractId: inferredContractId,
+      currentResult: result,
+    });
+    window.localStorage.setItem(
+      SOLUTION_WORKSPACE_STORAGE_KEY,
+      serializeSolutionWorkspaceState(nextState)
+    );
+    setWorkspaceState(nextState);
+    setWorkspaceResult(result);
+  }, [baseResultKey, problemText, materialSummary, inferredContractId, result]);
+
+  const submitRevision = async (rawInstruction: string, rawMode?: SolutionRevisionMode) => {
+    const instruction = rawInstruction.trim();
+    if (!instruction || isRevising) return;
+
+    const mode = rawMode ?? inferRevisionMode(instruction);
+    setIsRevising(true);
+    setRevisionError(null);
+    setRevisionNote(null);
+
+    try {
+      const response = await fetch('/api/radar/revise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          previousResult: workspaceResult,
+          instruction,
+          mode,
+          contractId: workspaceState?.contractId ?? inferredContractId,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || '继续调整失败，请稍后再试。');
+      }
+
+      const nextResult = data.result as SolutionResult;
+      const baseState = workspaceState ?? createSolutionWorkspaceState({
+        problemText,
+        materialSummary,
+        contractId: inferredContractId,
+        currentResult: workspaceResult,
+      });
+      const nextState = appendSolutionRevision(baseState, {
+        instruction,
+        mode,
+        result: nextResult,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          SOLUTION_WORKSPACE_STORAGE_KEY,
+          serializeSolutionWorkspaceState(nextState)
+        );
+      }
+
+      setWorkspaceResult(nextResult);
+      setWorkspaceState(nextState);
+      setRevisionText('');
+      setRevisionNote('已基于当前结果生成新版，并保存到本地工作台。');
+    } catch (error) {
+      setRevisionError(error instanceof Error ? error.message : '继续调整失败，请稍后再试。');
+    } finally {
+      setIsRevising(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <section className="relative overflow-hidden rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_24px_70px_rgba(0,80,180,0.12)] sm:p-7">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#2463EB] via-[#5DA2FF] to-[#D9E8FF]" />
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#2463EB] shadow-[0_14px_28px_rgba(36,99,235,0.22)]">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-[#2463EB]">Solution Workspace</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#111827]">你的第一版解决方案已生成</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#64748B]">FutureLens 已理解你的需求，并组织执行器生成可复制成果。</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
+          1. 我理解你的需求
+        </div>
+        <p className="text-base font-semibold leading-relaxed text-[#111827]">{workspaceResult.problemCore.summary}</p>
+      </section>
+
+      <ProcessingPlanCard plan={capabilityPlan} />
+
+      <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
+          3. 已生成第一版结果
+        </div>
+        <h2 className="text-xl font-semibold text-[#111827]">{workspaceResult.usableOutput.title}</h2>
+        <div className="mt-5 space-y-3">
+          {workspaceResult.usableOutput.sections.map(section => (
+            <div key={section.heading} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
+              <h3 className="text-sm font-semibold text-[#111827]">{section.heading}</h3>
+              <MarkdownContent content={section.content} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          4. 可直接复制使用
+        </div>
+        <div className="space-y-3">
+          {workspaceResult.copyableTemplates.map(template => (
+            <CopyableTemplateCard key={template.title} template={template} />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          5. 继续推进
+        </div>
+        <h2 className="text-lg font-semibold text-[#111827]">继续推进这个结果</h2>
+        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+          你可以让 FutureLens 基于当前结果继续修改，而不是重新开始。
+        </p>
+        <div className="mt-4 space-y-2">
+          {workspaceResult.clarifyingQuestions.slice(0, 3).map((question, index) => (
+            <div key={question} className="flex gap-3 rounded-2xl bg-[#F8FAFD] p-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#2463EB]">
+                {index + 1}
+              </div>
+              <p className="text-sm leading-relaxed text-[#1F2937]">{question}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {suggestions.map(suggestion => (
+            <button
+              key={suggestion}
+              type="button"
+              onClick={() => submitRevision(suggestion, inferRevisionMode(suggestion))}
+              disabled={isRevising}
+              className="rounded-full bg-[#EEF5FF] px-3 py-1.5 text-xs font-semibold text-[#2463EB] transition-colors hover:bg-[#DDEBFF] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={revisionText}
+          onChange={(event) => {
+            setRevisionText(event.target.value.slice(0, 1200));
+            setRevisionNote(null);
+            setRevisionError(null);
+          }}
+          rows={4}
+          placeholder="例如：帮我压缩成 5 页 PPT / 改得更像课堂汇报 / 生成最终可复制版本 / 细化第一部分"
+          className="mt-4 w-full rounded-2xl border border-[#D6E6FF] bg-[#FBFCFF] px-4 py-3 text-sm leading-relaxed text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#2463EB] focus:outline-none"
+        />
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-xs text-[#9CA3AF]">
+            已调整 {workspaceState?.revisions.length ?? 0} 次，只保存在本机浏览器，不写入数据库。
+          </span>
+          <button
+            type="button"
+            onClick={() => submitRevision(revisionText)}
+            disabled={!revisionText.trim() || isRevising}
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#111827] px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isRevising ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                正在调整
+              </>
+            ) : (
+              '继续调整'
+            )}
+          </button>
+        </div>
+        {revisionNote && (
+          <p className="mt-3 rounded-2xl bg-[#F4FBF5] px-4 py-3 text-xs leading-relaxed text-[#248A3D]">
+            {revisionNote}
+          </p>
+        )}
+        {revisionError && (
+          <p className="mt-3 rounded-2xl bg-[#FFF5F5] px-4 py-3 text-xs leading-relaxed text-[#C2410C]">
+            {revisionError}
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 interface CollapsibleAnalysisProps {
   children: React.ReactNode;
   defaultOpen?: boolean;
@@ -2316,7 +2574,7 @@ export default function RadarPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-5 py-8 sm:py-10">
-        <SolutionWorkspaceCard result={solutionResult} profile={profile} capabilityPlan={capabilityPlan} />
+        <SolutionWorkspaceV09Card result={solutionResult} profile={profile} capabilityPlan={capabilityPlan} />
 
         {showDebugAnalysis && (
           <CollapsibleAnalysis>
