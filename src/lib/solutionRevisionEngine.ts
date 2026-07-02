@@ -45,6 +45,19 @@ function mergeTemplates(
 }
 
 function inferResultContext(result: SolutionResult, contractId?: string): string {
+  if (
+    contractId
+    && [
+      'experience_rewrite',
+      'research_report',
+      'validation_plan',
+      'metric_analysis',
+      'analysis_table',
+    ].includes(contractId)
+  ) {
+    return contractId;
+  }
+
   const text = [
     contractId,
     result.usableOutput.title,
@@ -56,6 +69,7 @@ function inferResultContext(result: SolutionResult, contractId?: string): string
   if (/(experience_rewrite|STAR|项目经历|简历|投递|岗位)/i.test(text)) return 'experience_rewrite';
   if (/(research_report|调研汇报|课堂|老师|PPT|每页)/i.test(text)) return 'research_report';
   if (/(validation_plan|MVP|访谈|验证|核心假设|目标用户)/i.test(text)) return 'validation_plan';
+  if (/(品牌|文案|介绍|改写|正式版本|简洁版本)/i.test(text)) return 'copywriting_revision';
   if (/(metric_analysis|DAU|转化率|留存|业务负责人|异常波动)/i.test(text)) return 'metric_analysis';
   if (/(analysis_table|字段名|计算|数据|表格|报表|营业额)/i.test(text)) return 'analysis_table';
   return 'generic_document';
@@ -90,6 +104,17 @@ function buildFinalContent(previousResult: SolutionResult, context: string): str
       '本次分析围绕【核心对象】展开，先整理【关键字段】，再判断【变化 / 排名 / 异常】。',
       '当前最需要关注的是【关键结论】，主要依据是【数据证据】。',
       '建议下一步先做【动作 1】，再验证【动作 2】，最后记录【复盘指标】。',
+    ].join('\n');
+  }
+
+  if (context === 'copywriting_revision') {
+    return [
+      '最终可复制文案：',
+      '我们为【目标人群】提供【核心产品 / 服务】，帮助他们在【使用场景】中更轻松地解决【具体问题】。',
+      '这款产品的价值不只是“看起来高级”，而是通过【核心卖点一】、【核心卖点二】和【可信依据】带来更清晰、稳定的体验。',
+      '如果你正在寻找【用户真实需求】，它可以作为一个更可靠、更易理解的选择。',
+      '',
+      '可替换信息：目标人群、产品名称、使用场景、具体问题、核心卖点、可信依据。',
     ].join('\n');
   }
 
@@ -182,6 +207,75 @@ function buildFormalSections(previousResult: SolutionResult, context: string): S
   ];
 }
 
+function buildValidationInterviewSections(): Section[] {
+  return [
+    {
+      heading: '用户访谈提纲',
+      content: [
+        '1. 最近一次你遇到这个问题是什么时候？当时具体发生了什么？',
+        '2. 你现在通常怎么解决？用了哪些工具或替代方案？',
+        '3. 哪一步最麻烦、最耗时，或者最容易出错？',
+        '4. 如果有一个工具帮你处理，你最希望它先解决哪一件事？',
+        '5. 你愿意为了什么结果继续使用或付费？什么情况会让你不用？',
+      ].join('\n'),
+    },
+    {
+      heading: '访谈记录表',
+      content: [
+        '| 受访者 | 当前做法 | 最大痛点 | 替代方案 | 愿意尝试的功能 | 付费/持续使用信号 |',
+        '| --- | --- | --- | --- | --- | --- |',
+        '| 用户 A | 【现在怎么做】 | 【最麻烦的点】 | 【已有替代】 | 【想先试什么】 | 【是否愿意继续】 |',
+      ].join('\n'),
+    },
+  ];
+}
+
+function buildValidationTwoWeekSections(): Section[] {
+  return [
+    {
+      heading: '两周验证计划',
+      content: [
+        '第 1-2 天：写清核心假设，只保留最需要验证的 1-2 个问题。',
+        '第 3-5 天：访谈 5 个目标用户，记录真实行为和现有替代方案。',
+        '第 6-8 天：做一个低保真 MVP 流程图或演示稿，不急着开发完整产品。',
+        '第 9-11 天：让 3 个用户看演示并完成一次模拟任务。',
+        '第 12-14 天：整理是否继续做的判断：痛点强度、使用意愿、MVP 范围、下一步成本。',
+      ].join('\n'),
+    },
+    {
+      heading: '验证通过标准',
+      content: [
+        '- 至少 3 个用户明确说出同一个高频痛点。',
+        '- 至少 2 个用户愿意看 MVP 或继续试用。',
+        '- MVP 第一版能用 1 个核心流程证明价值。',
+        '- 如果用户只觉得“有意思”但没有真实使用场景，需要缩小问题或换目标人群。',
+      ].join('\n'),
+    },
+  ];
+}
+
+function buildUiExperienceSections(previousResult: SolutionResult): Section[] {
+  return [
+    {
+      heading: 'UI 岗项目经历改写重点',
+      content: [
+        '1. 把“做了设计”改成“解决了哪个界面 / 用户 / 信息表达问题”。',
+        '2. 强调 UI 岗相关能力：信息架构、组件规范、交互流程、视觉一致性、交付协作。',
+        '3. 每段项目经历至少补一个结果：页面数量、迭代次数、反馈、交付物或效率提升。',
+      ].join('\n'),
+    },
+    {
+      heading: 'UI 岗可替换项目描述',
+      content: [
+        '我负责【项目名称】中的 UI 设计与信息整理，围绕【目标用户 / 使用场景】梳理了【核心流程】。',
+        '在设计过程中，我完成了【页面 / 组件 / 视觉规范】并根据【反馈来源】进行迭代，最终产出【交付物】。',
+        '这个项目体现了我的界面结构、视觉统一和设计落地能力。',
+      ].join('\n'),
+    },
+    ...previousResult.usableOutput.sections.slice(0, 2),
+  ];
+}
+
 function buildStudentSections(previousResult: SolutionResult): Section[] {
   return [
     {
@@ -241,6 +335,9 @@ export function reviseSolutionResult(input: RevisionInput): SolutionResult {
   const isFormal = includesAny(instruction, ['正式', '专业', '老师', '汇报', '商务', '严谨', '业务负责人']);
   const isShort = includesAny(instruction, ['太长', '简短', '压缩', '少一点', '精简']);
   const isExpand = includesAny(instruction, ['细化', '展开', '继续写', '补充', '第一部分', '第1部分']);
+  const isInterview = context === 'validation_plan' && includesAny(instruction, ['访谈', '提纲', '问题']);
+  const isTwoWeekValidation = context === 'validation_plan' && /(两周|2周|14天|十四天)/.test(instruction) && includesAny(instruction, ['计划', '验证']);
+  const isUiExperience = context === 'experience_rewrite' && /(UI|界面|交互|视觉|设计岗|设计岗位)/i.test(instruction);
 
   if (isFinalize) {
     const finalContent = buildFinalContent(previous, context);
@@ -266,6 +363,18 @@ export function reviseSolutionResult(input: RevisionInput): SolutionResult {
     sections = buildActionSections(previous);
     titlePrefix = '执行清单版';
     addedTemplates = [{ title: '今日执行清单', content: sections.map(section => `${section.heading}\n${section.content}`).join('\n\n') }];
+  } else if (isInterview) {
+    sections = buildValidationInterviewSections();
+    titlePrefix = '访谈提纲版';
+    addedTemplates = [{ title: '用户访谈提纲', content: sections.map(section => `${section.heading}\n${section.content}`).join('\n\n') }];
+  } else if (isTwoWeekValidation) {
+    sections = buildValidationTwoWeekSections();
+    titlePrefix = '两周验证计划版';
+    addedTemplates = [{ title: '两周验证计划', content: sections.map(section => `${section.heading}\n${section.content}`).join('\n\n') }];
+  } else if (isUiExperience) {
+    sections = buildUiExperienceSections(previous);
+    titlePrefix = 'UI 岗项目经历版';
+    addedTemplates = [{ title: 'UI 岗项目经历改写', content: sections.map(section => `${section.heading}\n${section.content}`).join('\n\n') }];
   } else if (isPpt) {
     sections = buildPptSections(previous, instruction, context);
     titlePrefix = 'PPT 大纲版';

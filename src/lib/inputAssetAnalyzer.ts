@@ -115,6 +115,13 @@ function inferInputMode(input: AnalyzeInput, assetText: string, source: 'attache
 function inferAssetType(assetText: string, fullText: string): InputAssetType {
   if (!assetText) return 'unknown';
 
+  const strongTableLike =
+    includesAny(fullText, ['产品A', '产品B', '产品C', '卖了', '销量', '销售额', '订单', '字段', '排名', '占比', '卖得最好']) ||
+    (/\d+\s*(件|个|元|单|%)/.test(assetText) && includesAny(fullText, ['产品', '销售', '卖', '数据', '排名', '对比']));
+  if (strongTableLike) {
+    return 'table_like_text';
+  }
+
   const jobContext = includesAny(fullText, ['投递', '岗位', '求职', '简历', '面试', '招聘', 'UI 岗', 'UI设计岗位', '设计岗']);
   if (
     jobContext &&
@@ -144,10 +151,7 @@ function inferAssetType(assetText: string, fullText: string): InputAssetType {
     return 'report_draft';
   }
 
-  if (
-    includesAny(fullText, ['产品A', '产品B', '产品C', '卖了', '销量', '销售额', '订单', '数据', '字段', '排名', '占比']) ||
-    /\d+\s*(件|个|元|单|%)/.test(assetText) && includesAny(fullText, ['产品', '销售', '卖', '数据', '排名'])
-  ) {
+  if (TABLE_LIKE_PATTERN.test(assetText) && includesAny(fullText, ['表', '数据', '字段', '排名', '对比', '分析'])) {
     return 'table_like_text';
   }
 
