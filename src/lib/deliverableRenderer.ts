@@ -1,6 +1,7 @@
 import type { SolutionResult } from '@/types/radar';
 import type { OutputContract } from './outputContract';
 import type { OutputContractId, ProblemFrame } from './problemFrameEngine';
+import { compileBusinessWorkflow, type BusinessWorkflowFrame } from './businessWorkflowCompiler';
 
 type RenderedDeliverables = Pick<SolutionResult, 'usableOutput' | 'copyableTemplates' | 'nextRefinementPrompt'>;
 type CopyableTemplate = SolutionResult['copyableTemplates'][number];
@@ -776,6 +777,99 @@ function renderWorkflowLike(frame: ProblemFrame): RenderedDeliverables {
   };
 }
 
+function businessLabel(workflow: BusinessWorkflowFrame): string {
+  const labels: Record<BusinessWorkflowFrame['workflowType'], string> = {
+    restaurant_operation: '餐厅点餐 / 后厨 / 库存工作流',
+    factory_management: '工厂生产 / 质检管理工作流',
+    store_growth: '门店复购增长工作流',
+    training_operation: '培训机构招生 / 排课 / 跟进工作流',
+    team_management: '小团队日报 / 项目进度工作流',
+    business_generic: '小企业业务系统化工作流',
+  };
+  return labels[workflow.workflowType];
+}
+
+function renderBusinessSolutionWorkflow(frame: ProblemFrame): RenderedDeliverables {
+  const workflow = frame.businessWorkflow ?? compileBusinessWorkflow({
+    rawProblem: frame.rawProblem,
+    supportText: frame.supportText,
+  });
+
+  if (!workflow) return renderGenericDocument(frame);
+
+  const dataRows = workflow.requiredData.map(item => ['数据字段', item]);
+  const toolRows = workflow.requiredTools.map(item => ['工具/载体', item]);
+  const peopleRows = workflow.requiredPeople.map(item => ['人员/角色', item]);
+  const resources = table(['类型', '具体内容'], [...dataRows, ...toolRows, ...peopleRows]);
+  const workflowTable = table(
+    ['步骤', '输入物', '操作', '输出物', '完成标准'],
+    workflow.processBreakdown.map((step, index) => [
+      `${index + 1}`,
+      index === 0 ? '当前业务入口' : '上一环节记录',
+      step,
+      index === workflow.processBreakdown.length - 1 ? '老板可查看的经营结果' : '结构化记录',
+      '字段完整、负责人明确、状态可追踪',
+    ])
+  );
+  const landingPlan = table(
+    ['阶段', '要做的事', '负责人', '验收标准'],
+    workflow.implementationSteps.map((step, index) => [
+      `${index + 1}`,
+      step,
+      workflow.requiredPeople[index % workflow.requiredPeople.length] ?? '老板',
+      '能留下可检查记录，并能进入下一阶段',
+    ])
+  );
+  const sop = [
+    `1. 每天先按统一字段记录：${workflow.requiredData.slice(0, 3).join('；')}。`,
+    '2. 每个异常必须写清：发生位置、影响范围、负责人、下一步动作。',
+    '3. 当天结束前由负责人检查记录是否完整，不完整的直接补齐。',
+    '4. 老板或负责人只看看板里的关键指标，不再靠口头追问。',
+    '5. 每周复盘一次：保留有效流程，删掉没人用的字段，补上高频异常规则。',
+  ].join('\n');
+  const ownerNote = [
+    `当前最应该先解决的不是“买一个大系统”，而是把「${businessLabel(workflow)}」编译成一条能被员工执行、能被老板检查的最小流程。`,
+    `第一阶段优先级：${workflow.priority}`,
+    '这套方案第一版只要求三件事：统一记录字段、明确负责人、每天产出可查看的经营/进度摘要。',
+    '等这条流程稳定跑 2-4 周，再决定是否接入更正式的系统、AI 自动总结或外包开发。',
+  ].join('\n');
+  const devBrief = [
+    `项目名称：${businessLabel(workflow)}最小系统化方案`,
+    `业务角色：${workflow.businessRole}`,
+    '第一版目标：记录关键业务入口、处理状态、异常和老板看板，不做完整 SaaS。',
+    `核心模块：${workflow.processBreakdown.join('；')}`,
+    `数据字段：${workflow.requiredData.join('；')}`,
+    `角色权限：${workflow.requiredPeople.join('；')}`,
+    '必须支持：新增记录、状态更新、异常标记、日报/周报导出。',
+    '暂不支持：复杂会员体系、自动排班、财务系统对接、完整移动端后台。',
+    `验收标准：${workflow.priority}`,
+  ].join('\n');
+
+  return {
+    usableOutput: {
+      title: `${businessLabel(workflow)}第一版`,
+      sections: normalizeSections([
+        { heading: '真实问题诊断', content: bulletList(workflow.realProblems, '当前业务问题需要先被拆成可执行流程。') },
+        { heading: '当前业务流程拆解', content: workflowTable },
+        { heading: 'AI/系统方案蓝图', content: bulletList(workflow.aiSolutionBlueprint, '先用系统化记录和 AI 总结辅助经营判断。') },
+        { heading: '可执行业务工作流', content: workflow.processBreakdown.map((step, index) => `${index + 1}. ${step}`).join('\n') },
+        { heading: '所需数据 / 工具 / 人员', content: resources },
+        { heading: '30 天落地步骤', content: landingPlan },
+        { heading: '风险与优先级', content: [`优先级：${workflow.priority}`, '', '风险：', bulletList(workflow.risks, '第一版范围过大，导致无人执行。')].join('\n') },
+        { heading: '老板版说明', content: ownerNote },
+        { heading: '执行人员 SOP', content: sop },
+        { heading: '开发/外包需求文档结构', content: devBrief },
+      ]),
+    },
+    copyableTemplates: [
+      { title: '老板版说明', content: ownerNote },
+      { title: '执行人员 SOP', content: sop },
+      { title: '开发/外包需求文档结构', content: devBrief },
+    ],
+    nextRefinementPrompt: '补充你现在最乱的一条业务流程、现有记录方式、员工人数和每天最想看的指标，我可以继续压缩成 30 天落地版。',
+  };
+}
+
 function renderByContract(frame: ProblemFrame, contractId: OutputContractId): RenderedDeliverables {
   if (contractId === 'message_draft') return renderMessageDraft();
   if (contractId === 'research_report') return renderResearchReport();
@@ -788,10 +882,15 @@ function renderByContract(frame: ProblemFrame, contractId: OutputContractId): Re
   if (contractId === 'experience_rewrite') return renderExperienceRewrite();
   if (contractId === 'project_retrospective') return renderProjectRetrospective();
   if (contractId === 'clarification_flow') return renderClarificationFlow();
+  if (contractId === 'business_solution_workflow') return renderBusinessSolutionWorkflow(frame);
   return renderGenericDocument(frame);
 }
 
 export function renderDeliverables(frame: ProblemFrame, contract: OutputContract): RenderedDeliverables {
+  if (contract.contractId === 'business_solution_workflow') {
+    return renderBusinessSolutionWorkflow(frame);
+  }
+
   if (frame.inputAsset && frame.inputAsset.inputMode !== 'problem_only') {
     return renderInputAsset(frame);
   }

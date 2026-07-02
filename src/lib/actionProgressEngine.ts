@@ -29,6 +29,7 @@ function compactResultText(result: SolutionResult): string {
 function inferContract(result: SolutionResult, contractId?: string): string {
   if (contractId) return contractId;
   const text = compactResultText(result);
+  if (/(业务工作流|老板版说明|执行人员 SOP|开发\/外包需求文档|后厨|库存|质检|会员运营|排课|负责人看板)/.test(text)) return 'business_solution_workflow';
   if (/(调研|汇报|PPT|课堂|老师|资料清单)/.test(text)) return 'research_report';
   if (/(简历|项目经历|STAR|投递|岗位)/.test(text)) return 'experience_rewrite';
   if (/(数据|字段|分析|汇报文案|销售|营业额|指标)/.test(text)) return 'analysis_table';
@@ -94,6 +95,16 @@ export function extractActionItems(result: SolutionResult, contractId?: string):
       makeItem('validation-interview', '准备访谈提纲', '访谈要问真实行为，不问空泛态度。', '访谈问题清单', '至少 5 个问题，覆盖现状、痛点、替代方案和付费意愿。'),
       makeItem('validation-mvp', '圈定 MVP 范围', '防止第一版做太大。', 'MVP 功能清单', '功能分成必须做、可延后、不做三类。'),
       makeItem('validation-plan', '安排两周验证', '把验证变成可执行节奏。', '两周执行计划', '每天或每两天都有明确产出。'),
+    ];
+  }
+
+  if (resolvedContract === 'business_solution_workflow') {
+    return [
+      makeItem('business-priority', '确认最优先改造的一条流程', '业务系统化不能一次覆盖全部，先选最乱且最影响经营的一条链路。', '一条优先业务流程', '写清流程入口、结束点、负责人和老板要看的结果。'),
+      makeItem('business-fields', '固定记录字段', '字段不统一，AI 和系统都无法稳定工作。', '业务字段表', '每个字段都有用途、填写人、更新时间和检查标准。'),
+      makeItem('business-pilot', '跑一周最小试点', '先让真实员工按流程跑起来，再判断是否需要工具或外包。', '一周试点记录', '至少连续 5 天留下完整记录和异常说明。'),
+      makeItem('business-sop', '写给执行人员的 SOP', '员工必须知道每一步怎么做、做到什么算完成。', '执行人员 SOP', 'SOP 包含步骤、输入物、输出物、异常处理和负责人。'),
+      makeItem('business-brief', '整理开发/外包需求文档', '如果要找工具或外包，需要先把流程和字段说清楚。', '开发/外包需求文档结构', '包含业务目标、模块、字段、角色、暂不做事项和验收标准。'),
     ];
   }
 

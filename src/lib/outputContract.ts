@@ -24,6 +24,7 @@ export type DeliverableType =
   | 'experience_rewrite'
   | 'project_retrospective'
   | 'clarification_flow'
+  | 'business_solution_workflow'
   | 'generic_document'
   | 'mixed';
 
@@ -81,6 +82,12 @@ function deliverableTypeForSection(contractId: OutputContractId, section: string
   if (contractId === 'experience_rewrite') return section.includes('模板') || section.includes('描述') ? 'experience_rewrite' : 'checklist';
   if (contractId === 'project_retrospective') return section.includes('表') ? 'table' : 'document';
   if (contractId === 'clarification_flow') return section.includes('表') ? 'clarification_flow' : 'workflow';
+  if (contractId === 'business_solution_workflow') {
+    if (section.includes('SOP') || section.includes('流程') || section.includes('步骤')) return 'workflow';
+    if (section.includes('数据') || section.includes('工具') || section.includes('人员')) return 'table';
+    if (section.includes('说明') || section.includes('需求文档')) return 'document';
+    return 'business_solution_workflow';
+  }
   if (section.includes('表')) return 'table';
   if (section.includes('流程') || section.includes('SOP')) return 'workflow';
   if (section.includes('脚本')) return 'script';

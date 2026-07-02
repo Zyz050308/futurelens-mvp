@@ -1,5 +1,6 @@
 import type { FutureProfile } from '@/types/radar';
 import type { InputAssetFrame, InputMode } from './inputAssetAnalyzer';
+import { compileBusinessWorkflow, type BusinessWorkflowFrame } from './businessWorkflowCompiler';
 
 export type UserAction =
   | 'create'
@@ -36,6 +37,7 @@ export type ProblemArchetype =
   | 'risk_plan'
   | 'experience_rewrite'
   | 'clarification_flow'
+  | 'business_workflow'
   | 'generic';
 
 export type OutputContractId =
@@ -50,6 +52,7 @@ export type OutputContractId =
   | 'experience_rewrite'
   | 'project_retrospective'
   | 'clarification_flow'
+  | 'business_solution_workflow'
   | 'generic_document';
 
 export type ProblemFrame = {
@@ -57,6 +60,7 @@ export type ProblemFrame = {
   supportText: string;
   inputMode?: InputMode;
   inputAsset?: InputAssetFrame;
+  businessWorkflow?: BusinessWorkflowFrame;
   userNeed: string;
   centerOutput: {
     name: string;
@@ -244,6 +248,7 @@ function selectContractId(
 
 function archetypeFromContract(contractId: OutputContractId): ProblemArchetype {
   if (contractId === 'rubric_assignment' || contractId === 'rubric_self_assessment') return 'rubric';
+  if (contractId === 'business_solution_workflow') return 'business_workflow';
   if (contractId === 'project_retrospective' || contractId === 'message_draft' || contractId === 'generic_document') return 'generic';
   return contractId;
 }
@@ -251,6 +256,7 @@ function archetypeFromContract(contractId: OutputContractId): ProblemArchetype {
 function outputTypeFromContract(contractId: OutputContractId, rawProblem: string): OutputType {
   if (contractId === 'message_draft') return 'message';
   if (contractId === 'analysis_table' || contractId === 'metric_analysis') return 'table';
+  if (contractId === 'business_solution_workflow') return 'workflow';
   if (contractId === 'clarification_flow' || contractId === 'risk_plan') return 'workflow';
   if (contractId === 'generic_document') {
     if (includesAny(rawProblem, ['财务报表', '报表', '销售表', '表格', 'Excel'])) return 'table';
@@ -278,6 +284,7 @@ function centerOutputName(contractId: OutputContractId, rawProblem: string): str
     experience_rewrite: '项目经历优化方案',
     project_retrospective: '项目复盘结构 / 经验整理表',
     clarification_flow: '问题澄清流程 / 下一步行动判断',
+    business_solution_workflow: 'AI / 系统化业务工作流',
     generic_document: includesAny(rawProblem, ['短视频', '视频方案', '分镜', '脚本'])
       ? '可复用内容模板 / 生产流程'
       : includesAny(rawProblem, ['工作流程很乱', '每天先做什么'])
@@ -320,6 +327,7 @@ function inferObject(rawProblem: string, contractId: OutputContractId): string {
   if (contractId === 'experience_rewrite') return '项目经历';
   if (contractId === 'project_retrospective') return '项目复盘';
   if (contractId === 'clarification_flow') return '当前混乱问题';
+  if (contractId === 'business_solution_workflow') return '业务流程';
   if (includesAny(rawProblem, ['短视频'])) return '短视频模板';
   if (includesAny(rawProblem, ['材料'])) return '材料';
   if (includesAny(rawProblem, ['财务报表'])) return '财务报表';
@@ -389,6 +397,7 @@ function inferTransformation(rawProblem: string, contractId: OutputContractId): 
     experience_rewrite: ['经历诊断', 'STAR改写', '量化补充', '投递检查'],
     project_retrospective: ['项目复盘', '记录表', '经验总结', '下次改进'],
     clarification_flow: ['问题分类', '快速澄清', '最小行动', '继续补充'],
+    business_solution_workflow: ['业务诊断', '流程拆解', 'AI/系统方案', '人员数据工具', '落地步骤', 'SOP'],
     generic_document: ['明确目标', '生成第一版材料', '检查可用性'],
   };
 
@@ -423,6 +432,7 @@ function inferMissingInfo(contractId: OutputContractId): string[] {
     experience_rewrite: ['目标岗位', '项目背景', '结果数据'],
     project_retrospective: ['项目名称', '当时目标', '结果如何'],
     clarification_flow: ['当前脑中任务', '最急的一件事', '今晚可完成动作'],
+    business_solution_workflow: ['最乱的业务流程', '现有记录方式', '执行人员', '老板最想看到的指标'],
     generic_document: ['目标对象', '已有材料', '完成标准'],
   };
 
@@ -435,7 +445,8 @@ export function buildProblemFrame(
 ): ProblemFrame {
   const rawProblem = getRawProblem(profile);
   const supportText = getSupportText(profile);
-  const contractId = selectContractId(rawProblem, supportText, options.inputAssetFrame);
+  const businessWorkflow = compileBusinessWorkflow({ rawProblem, supportText }) ?? undefined;
+  const contractId = businessWorkflow?.suggestedContractId ?? selectContractId(rawProblem, supportText, options.inputAssetFrame);
   const archetype = archetypeFromContract(contractId);
   const centerOutput = {
     name: centerOutputName(contractId, rawProblem),
@@ -459,6 +470,7 @@ export function buildProblemFrame(
     supportText,
     inputMode: options.inputAssetFrame?.inputMode,
     inputAsset: options.inputAssetFrame,
+    businessWorkflow,
     userNeed: `用户想把当前问题推进成：${centerOutput.name}`,
     centerOutput,
     archetype,
