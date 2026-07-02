@@ -1391,7 +1391,7 @@ function SolutionWorkspaceCard({ result, profile, capabilityPlan }: { result: So
 
       <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
-          3. 已生成第一版结果
+          当前成果
         </div>
         <h2 className="text-xl font-semibold text-[#111827]">{result.usableOutput.title}</h2>
         <div className="mt-5 space-y-3">
@@ -1608,6 +1608,20 @@ function OutcomeStateCard({
         </button>
         <button
           type="button"
+          onClick={() => onInstruction('继续调整当前成果，让它更具体可用')}
+          className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#2463EB] ring-1 ring-[#D6E6FF] transition-colors hover:bg-[#F8FAFD]"
+        >
+          继续调整
+        </button>
+        <button
+          type="button"
+          onClick={() => onInstruction('生成最终可复制版本')}
+          className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#2463EB] ring-1 ring-[#D6E6FF] transition-colors hover:bg-[#F8FAFD]"
+        >
+          生成最终版
+        </button>
+        <button
+          type="button"
           onClick={() => onInstruction('重新拆解执行清单')}
           className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#64748B] ring-1 ring-[#D6E6FF] transition-colors hover:bg-[#F8FAFD]"
         >
@@ -1806,20 +1820,24 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
         </div>
       </section>
 
-      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
-        <div className="mb-3 inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#2463EB]">
-          1. 我理解你的需求
-        </div>
-        <p className="text-base font-semibold leading-relaxed text-[#111827]">{workspaceResult.problemCore.summary}</p>
-      </section>
+      <OutcomeStateCard outcome={outcomeState} onInstruction={(instruction) => submitRevision(instruction, inferRevisionMode(instruction))} />
 
-      <ProcessingPlanCard plan={capabilityPlan} />
 
       <section className="rounded-3xl border border-[#C7DBFF] bg-white p-5 shadow-[0_18px_48px_rgba(0,80,180,0.08)] sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#2463EB] px-3 py-1 text-xs font-semibold text-white">
           3. 已生成第一版结果
         </div>
         <h2 className="text-xl font-semibold text-[#111827]">{workspaceResult.usableOutput.title}</h2>
+        <div className="mt-4 grid gap-3 rounded-2xl bg-[#F8FAFD] p-4 text-sm leading-relaxed text-[#475569] sm:grid-cols-[1.4fr_1fr]">
+          <div>
+            <div className="text-xs font-semibold text-[#2463EB]">我理解你的需求</div>
+            <p className="mt-1 text-[#111827]">{workspaceResult.problemCore.summary}</p>
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-[#2463EB]">这次会用到</div>
+            <p className="mt-1">{capabilityPlan.requiredCapabilities.slice(0, 4).map(item => item.label).join(' / ')}</p>
+          </div>
+        </div>
         <div className="mt-5 space-y-3">
           {workspaceResult.usableOutput.sections.map(section => (
             <div key={section.heading} className="rounded-2xl border border-[#E5EAF3] bg-[#FBFCFF] p-4">
@@ -1830,24 +1848,11 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
         </div>
       </section>
 
-      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
-        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          4. 可直接复制使用
-        </div>
-        <div className="space-y-3">
-          {workspaceResult.copyableTemplates.map(template => (
-            <CopyableTemplateCard key={template.title} template={template} />
-          ))}
-        </div>
-      </section>
 
-      <OutcomeStateCard outcome={outcomeState} onInstruction={(instruction) => submitRevision(instruction, inferRevisionMode(instruction))} />
-
-      <ActionProgressCard progress={actionProgress} onUpdate={handleActionProgressUpdate} />
 
       <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
         <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
-          5. 继续推进
+          继续调整
         </div>
         <h2 className="text-lg font-semibold text-[#111827]">继续推进这个结果</h2>
         <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
@@ -1917,6 +1922,21 @@ function SolutionWorkspaceV09Card({ result, profile, capabilityPlan }: { result:
             {revisionError}
           </p>
         )}
+      </section>
+
+      <ActionProgressCard progress={actionProgress} onUpdate={handleActionProgressUpdate} />
+
+      <section className="rounded-3xl border border-[#E5EAF3] bg-white p-5 sm:p-6">
+        <div className="mb-3 inline-flex rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-semibold text-[#64748B]">
+          最终可复制区
+        </div>
+        <h2 className="text-lg font-semibold text-[#111827]">把确认后的内容直接拿去用</h2>
+        <p className="mt-2 text-sm leading-relaxed text-[#64748B]">生成最终版后，这里会保持最新的可复制材料；你也可以先复制当前版本继续使用。</p>
+        <div className="mt-4 space-y-3">
+          {workspaceResult.copyableTemplates.map(template => (
+            <CopyableTemplateCard key={template.title} template={template} />
+          ))}
+        </div>
       </section>
     </div>
   );
